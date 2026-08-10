@@ -1,0 +1,31 @@
+# Xcode
+build/
+DerivedData/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.xcscmblueprint
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# macOS
+.DS_Store
+*.swp
+
+# CocoaPods / Carthage (kalau nanti dipakai)
+Pods/
+Carthage/Build/
+
+# Secrets, kalau nanti ada API key backend
+Secrets.plist
+*.env

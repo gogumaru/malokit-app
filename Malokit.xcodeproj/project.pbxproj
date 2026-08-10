@@ -29,9 +29,22 @@
 		8D14A5B3302979CB00051CE5 /* MalokitUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MalokitUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		8D14A60E3029826F00051CE5 /* Exceptions for "Malokit" folder in "Malokit" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 8D14A599302979CA00051CE5 /* Malokit */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		8D14A59C302979CA00051CE5 /* Malokit */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				8D14A60E3029826F00051CE5 /* Exceptions for "Malokit" folder in "Malokit" target */,
+			);
 			path = Malokit;
 			sourceTree = "<group>";
 		};
@@ -400,6 +413,9 @@
 				DEVELOPMENT_TEAM = J424AXQY5M;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Malokit/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Malokit uses the camera to capture the five intraoral views used for IOTN scoring.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Import existing intraoral photos instead of shooting new ones.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -432,6 +448,9 @@
 				DEVELOPMENT_TEAM = J424AXQY5M;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Malokit/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Malokit uses the camera to capture the five intraoral views used for IOTN scoring.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Import existing intraoral photos instead of shooting new ones.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
