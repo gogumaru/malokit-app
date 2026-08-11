@@ -5,7 +5,12 @@ struct AnalyzingView: View {
     @Binding var path: [Route]
 
     @Environment(CaseStore.self) private var store
+    @Environment(ServerSettings.self) private var settings
+
+    /// Built once on appear from the current settings, so the choice between
+    /// the mock and the real server is made at run time, not at compile time.
     @State private var pipeline = AnalysisPipeline()
+    @State private var started = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -17,9 +22,9 @@ struct AnalyzingView: View {
             }
 
             VStack(spacing: 0) {
-                ForEach(Array(AnalysisStage.allCases.enumerated()), id: \.element.id) { index, stage in
+                ForEach(Array(pipeline.stages.enumerated()), id: \.element.id) { index, stage in
                     stageRow(stage)
-                    if index < AnalysisStage.allCases.count - 1 {
+                    if index < pipeline.stages.count - 1 {
                         Divider().padding(.leading, 42)
                     }
                 }
@@ -29,11 +34,16 @@ struct AnalyzingView: View {
             if case .failed(let message) = pipeline.state {
                 VStack(alignment: .leading, spacing: 10) {
                     Text(message).font(.footnote).foregroundStyle(Theme.urgent)
-                    Button("Try again") {
-                        Task { await pipeline.run(caseID: caseID, store: store) }
+                    HStack(spacing: 10) {
+                        Button("Try again") {
+                            Task { await pipeline.run(caseID: caseID, store: store) }
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(Theme.accent)
+
+                        Button("Server settings") { path.append(.settings) }
+                            .buttonStyle(.bordered)
                     }
-                    .buttonStyle(.bordered)
-                    .tint(Theme.accent)
                 }
                 .card()
             }
@@ -45,11 +55,14 @@ struct AnalyzingView: View {
         .navigationTitle("Analysing")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(pipeline.state != .idle && !isFailed)
-        .task { await pipeline.run(caseID: caseID, store: store) }
+        .task {
+            guard !started else { return }
+            started = true
+            pipeline = AnalysisPipeline(engine: settings.makeEngine())
+            await pipeline.run(caseID: caseID, store: store)
+        }
         .onChange(of: pipeline.state) { _, state in
-            if state == .finished {
-                path = [.result(caseID)]
-            }
+            if state == .finished { path = [.result(caseID)] }
         }
     }
 
@@ -60,9 +73,9 @@ struct AnalyzingView: View {
 
     private var headline: String {
         switch pipeline.state {
-        case .failed: "Analysis stopped"
+        case .failed:   "Analysis stopped"
         case .finished: "Done"
-        default: "Reading five views"
+        default:        "Reading five views"
         }
     }
 
@@ -73,8 +86,7 @@ struct AnalyzingView: View {
         return HStack(spacing: 12) {
             ZStack {
                 if isDone {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(Theme.accent)
+                    Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent)
                 } else if isActive {
                     ProgressView().controlSize(.small)
                 } else {
@@ -87,9 +99,7 @@ struct AnalyzingView: View {
                 Text(stage.title)
                     .font(.subheadline.weight(isActive ? .semibold : .regular))
                     .foregroundStyle(isDone || isActive ? Theme.ink : Theme.inkSoft)
-                Text(stage.detail)
-                    .font(.caption2)
-                    .foregroundStyle(Theme.inkSoft)
+                Text(stage.detail).font(.caption2).foregroundStyle(Theme.inkSoft)
             }
             Spacer()
         }

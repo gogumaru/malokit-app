@@ -63,8 +63,17 @@ enum AnalysisError: LocalizedError {
 /// whether the numbers came from a mock, a server, or an on device model.
 protocol AnalysisEngine {
     var name: String { get }
+    /// Which stages this engine actually runs. Engines that do not produce an
+    /// aesthetic component or a 3D mesh omit those, so the progress screen
+    /// never shows a step ticking by for work nobody is doing.
+    var stages: [AnalysisStage] { get }
     func analyze(
         _ input: AnalysisInput,
         onStage: @escaping @MainActor (AnalysisStage) -> Void
     ) async throws -> AnalysisResult
+}
+
+
+extension AnalysisEngine {
+    var stages: [AnalysisStage] { AnalysisStage.allCases }
 }

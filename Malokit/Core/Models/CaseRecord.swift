@@ -12,7 +12,10 @@ enum CaseStatus: String, Codable {
 struct AnalysisResult: Codable, Hashable {
     var angle: AngleReading
     var dhc: DHCResult
-    var ac: ACResult
+    /// Optional on purpose: the DHC server does not produce an aesthetic
+    /// component. AC comes from a separate pipeline that does not exist yet,
+    /// so a result with DHC but no AC is a normal outcome, not a broken one.
+    var ac: ACResult?
     /// Filename of the reconstructed mesh inside the case folder, if any.
     var model3DFilename: String?
     /// Narrative paragraph. Written by the report LLM in the real pipeline.
@@ -29,8 +32,6 @@ struct AnalysisResult: Codable, Hashable {
         case findingsFound  = "Findings to review"
         case clear          = "No findings flagged"
     }
-    
-    // test
 
     var summary: CaseSummary {
         if dhc.hasAnyWarning || angle.disagreement || dhc.missing.disagreement {

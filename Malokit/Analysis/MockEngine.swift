@@ -45,10 +45,14 @@ struct MockEngine: AnalysisEngine {
                 reliability: .unreliable,
                 warnings: ["Both sides flagged, value may be unstable"]
             ),
+            // Anterior crossbite mirrors overjet: a positive overjet means no
+            // anterior crossbite. Null here would wrongly read as "could not
+            // check" rather than "checked, none found".
             anteriorCrossbite: Reading(
-                value: nil,
-                label: nil,
-                reliability: .notComputed
+                value: 0.62,
+                label: "no anterior crossbite",
+                side: "right",
+                reliability: .reliable
             ),
             posteriorCrossbite: CrossbitePosterior(
                 label: "Possible posterior crossbite",

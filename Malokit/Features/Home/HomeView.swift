@@ -15,6 +15,11 @@ struct HomeView: View {
         .screenBackground()
         .navigationTitle("Malokit")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { path.append(.settings) } label: {
+                    Image(systemName: "gearshape")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: startCase) {
                     Label("New analysis", systemImage: "plus")
@@ -119,7 +124,7 @@ private struct CaseRow: View {
             HStack(spacing: 6) {
                 Circle().fill(summaryTint(result.summary)).frame(width: 7, height: 7)
                 Text(result.summary.rawValue)
-                Text(". \(result.dhc.reliableCount)/6 reliable . AC \(result.ac.score)")
+                Text(". \(result.dhc.reliableCount)/6 reliable" + (result.ac.map { " . AC \($0.score)" } ?? ""))
                     .foregroundStyle(Theme.inkSoft)
             }
             .font(.caption.weight(.medium))

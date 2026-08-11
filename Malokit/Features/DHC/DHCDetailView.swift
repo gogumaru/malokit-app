@@ -17,7 +17,7 @@ struct DHCDetailView: View {
                     banner
                     readingRow(.overjet, dhc.overjet)
                     readingRow(.overbite, dhc.overbite)
-                    readingRow(.crossbiteAnterior, dhc.anteriorCrossbite)
+                    anteriorCrossbiteRow(dhc.anteriorCrossbite)
                     posteriorRow(dhc.posteriorCrossbite)
                     missingRow(dhc.missing)
                     crowdingRow(dhc.crowding)
@@ -125,6 +125,42 @@ struct DHCDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(10)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    // MARK: - Anterior crossbite
+
+    /// Presented as presence, not as a number.
+    ///
+    /// The server derives this from the sign of overjet, so its `value` is the
+    /// same figure already shown in the overjet row. Repeating it would make a
+    /// clinician hunt for a difference that does not exist, so the number is
+    /// demoted to a caption and the state is what leads.
+    private func anteriorCrossbiteRow(_ reading: Reading) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            rowHeader("Anterior crossbite",
+                      symbol: DHCParameter.crossbiteAnterior.symbol,
+                      reliability: reading.reliability)
+
+            if reading.hasValue {
+                let isPresent = (reading.value ?? 0) < 0
+                HStack(spacing: 8) {
+                    Image(systemName: isPresent ? "exclamationmark.circle.fill" : "checkmark.circle")
+                        .foregroundStyle(isPresent ? Theme.watch : Theme.calm)
+                    Text(isPresent ? "Present" : "Not present")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Theme.ink)
+                    Spacer()
+                }
+                Text("Derived from the sign of overjet (\(reading.formatted())), not measured separately.")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.inkSoft)
+            } else {
+                notComputedBlock(.crossbiteAnterior)
+            }
+
+            warningLines(reading.warnings)
+        }
+        .card(padding: 14)
     }
 
     // MARK: - Posterior crossbite

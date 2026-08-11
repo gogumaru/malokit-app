@@ -78,6 +78,50 @@ struct MissingReading: Codable, Hashable {
     var warnings: [String]
 
     var primaryCount: Int? { occlusalGaps ?? frontalGaps }
+
+    init(
+        occlusalGaps: Int?,
+        frontalGaps: Int?,
+        disagreement: Bool,
+        reliability: Reliability,
+        warnings: [String] = []
+    ) {
+        self.occlusalGaps = occlusalGaps
+        self.frontalGaps = frontalGaps
+        self.disagreement = disagreement
+        self.reliability = reliability
+        self.warnings = warnings
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case occlusalGaps = "occlusal_gaps"
+        case frontalGaps = "frontal_gaps"
+        case disagreement, reliable, warnings
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        occlusalGaps = try c.decodeIfPresent(Int.self, forKey: .occlusalGaps)
+        frontalGaps = try c.decodeIfPresent(Int.self, forKey: .frontalGaps)
+        disagreement = try c.decodeIfPresent(Bool.self, forKey: .disagreement) ?? false
+        warnings = try c.decodeIfPresent([String].self, forKey: .warnings) ?? []
+
+        let reliable = try c.decodeIfPresent(Bool.self, forKey: .reliable) ?? false
+        if occlusalGaps == nil && frontalGaps == nil {
+            reliability = .notComputed
+        } else {
+            reliability = reliable ? .reliable : .unreliable
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(occlusalGaps, forKey: .occlusalGaps)
+        try c.encodeIfPresent(frontalGaps, forKey: .frontalGaps)
+        try c.encode(disagreement, forKey: .disagreement)
+        try c.encode(reliability == .reliable, forKey: .reliable)
+        try c.encode(warnings, forKey: .warnings)
+    }
 }
 
 /// Crowding is per arch and can name specific teeth, so it is not a single
@@ -88,6 +132,45 @@ struct CrowdingArch: Codable, Hashable {
     var flaggedTeeth: [Int]
     var reliability: Reliability
     var warnings: [String]
+
+    init(
+        sum: Double?,
+        label: String?,
+        flaggedTeeth: [Int] = [],
+        reliability: Reliability,
+        warnings: [String] = []
+    ) {
+        self.sum = sum
+        self.label = label
+        self.flaggedTeeth = flaggedTeeth
+        self.reliability = reliability
+        self.warnings = warnings
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case sum, label, warnings, reliable
+        case flaggedTeeth = "flagged_teeth"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        sum = try c.decodeIfPresent(Double.self, forKey: .sum)
+        label = try c.decodeIfPresent(String.self, forKey: .label)
+        flaggedTeeth = try c.decodeIfPresent([Int].self, forKey: .flaggedTeeth) ?? []
+        warnings = try c.decodeIfPresent([String].self, forKey: .warnings) ?? []
+
+        let reliable = try c.decodeIfPresent(Bool.self, forKey: .reliable) ?? false
+        reliability = sum == nil ? .notComputed : (reliable ? .reliable : .unreliable)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(sum, forKey: .sum)
+        try c.encodeIfPresent(label, forKey: .label)
+        try c.encode(flaggedTeeth, forKey: .flaggedTeeth)
+        try c.encode(reliability == .reliable, forKey: .reliable)
+        try c.encode(warnings, forKey: .warnings)
+    }
 }
 
 struct CrowdingReading: Codable, Hashable {
@@ -111,6 +194,31 @@ struct CrossbitePosterior: Codable, Hashable {
     var reliability: Reliability
 
     var isPresent: Bool { !flagged.isEmpty }
+
+    init(label: String?, flagged: [CrossbiteFlag] = [], reliability: Reliability) {
+        self.label = label
+        self.flagged = flagged
+        self.reliability = reliability
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case label, flagged, reliable
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        label = try c.decodeIfPresent(String.self, forKey: .label)
+        flagged = try c.decodeIfPresent([CrossbiteFlag].self, forKey: .flagged) ?? []
+        let reliable = try c.decodeIfPresent(Bool.self, forKey: .reliable) ?? false
+        reliability = reliable ? .reliable : .unreliable
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(label, forKey: .label)
+        try c.encode(flagged, forKey: .flagged)
+        try c.encode(reliability == .reliable, forKey: .reliable)
+    }
 }
 
 /// The full DHC output. Every field is optional or carries its own reliability,
@@ -123,6 +231,12 @@ struct DHCResult: Codable, Hashable {
     var posteriorCrossbite: CrossbitePosterior
     var missing: MissingReading
     var crowding: CrowdingReading
+
+    enum CodingKeys: String, CodingKey {
+        case overjet, overbite, missing, crowding
+        case anteriorCrossbite = "anterior_crossbite"
+        case posteriorCrossbite = "crossbite_posterior"
+    }
 
     /// How many of the six parameters produced a trustworthy value. Drives the
     /// honest one-line summary on the result screen.
