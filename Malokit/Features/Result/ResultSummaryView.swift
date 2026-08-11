@@ -58,6 +58,9 @@ struct ResultSummaryView: View {
 
     private func reason(_ result: AnalysisResult) -> String {
         let dhcPart = "\(result.dhc.decidingComponent.title.lowercased()) reaches \(result.dhc.band.rawValue.lowercased())"
+        guard result.ac.isScorable else {
+            return "Decided by \(dhcPart). The aesthetic component photo was not scored, it's out of the model's scope."
+        }
         let acPart = "aesthetic component scores \(result.ac.score) of 10"
         return "Decided by \(dhcPart), and the \(acPart)."
     }
@@ -102,9 +105,9 @@ struct ResultSummaryView: View {
 
             featureCard(
                 title: "IOTN AC",
-                value: "\(result.ac.score) of 10",
-                detail: result.ac.band.rawValue,
-                band: result.ac.band,
+                value: result.ac.isScorable ? "\(result.ac.score) of 10" : "Not scored",
+                detail: result.ac.isScorable ? result.ac.band.rawValue : "Out of model scope",
+                band: result.ac.isScorable ? result.ac.band : nil,
                 symbol: "photo.stack"
             ) { path.append(.ac(caseID)) }
 

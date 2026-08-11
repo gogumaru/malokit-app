@@ -22,8 +22,13 @@ struct AnalysisResult: Codable, Hashable {
 
     /// The single verdict shown at the top of the summary. Either component
     /// reaching definite need is enough to escalate the whole case.
+    ///
+    /// When the aesthetic component couldn't be scored (photo rejected as
+    /// out of the model's scope), it has no valid band to contribute, so the
+    /// verdict falls back to DHC alone rather than mixing in a stale score.
     var verdict: SeverityBand {
-        dhc.band.rank >= ac.band.rank ? dhc.band : ac.band
+        guard ac.isScorable else { return dhc.band }
+        return dhc.band.rank >= ac.band.rank ? dhc.band : ac.band
     }
 }
 
