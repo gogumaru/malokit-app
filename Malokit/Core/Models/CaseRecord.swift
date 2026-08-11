@@ -12,10 +12,7 @@ enum CaseStatus: String, Codable {
 struct AnalysisResult: Codable, Hashable {
     var angle: AngleReading
     var dhc: DHCResult
-    /// Optional on purpose: the DHC server does not produce an aesthetic
-    /// component. AC comes from a separate pipeline that does not exist yet,
-    /// so a result with DHC but no AC is a normal outcome, not a broken one.
-    var ac: ACResult?
+    var ac: ACResult
     /// Filename of the reconstructed mesh inside the case folder, if any.
     var model3DFilename: String?
     /// Narrative paragraph. Written by the report LLM in the real pipeline.
@@ -37,13 +34,14 @@ struct AnalysisResult: Codable, Hashable {
         if dhc.hasAnyWarning || angle.disagreement || dhc.missing.disagreement {
             return .reviewNeeded
         }
-        if !dhc.notComputedParameters.isEmpty {
+        if !dhc.notComputedParameters.isEmpty || !ac.isScorable {
             return .partialResult
         }
         let anyFinding = dhc.posteriorCrossbite.isPresent
             || (dhc.crowding.upper?.flaggedTeeth.isEmpty == false)
             || (dhc.crowding.lower?.flaggedTeeth.isEmpty == false)
             || (dhc.overjet.label?.isEmpty == false)
+            || ac.band != .noNeed
         return anyFinding ? .findingsFound : .clear
     }
 }

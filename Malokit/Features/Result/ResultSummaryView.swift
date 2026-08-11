@@ -151,21 +151,13 @@ struct ResultSummaryView: View {
                 symbol: "ruler"
             ) { path.append(.dhc(caseID)) }
 
-            if let ac = result.ac {
-                featureCard(
-                    title: "IOTN AC",
-                    value: "\(ac.score) of 10",
-                    detail: ac.band.rawValue,
-                    tint: Theme.severity(ac.band),
-                    symbol: "photo.stack"
-                ) { path.append(.ac(caseID)) }
-            } else {
-                unavailableCard(
-                    title: "IOTN AC",
-                    detail: "The aesthetic component comes from a separate pipeline that is not connected yet.",
-                    symbol: "photo.stack"
-                )
-            }
+            featureCard(
+                title: "IOTN AC",
+                value: result.ac.isScorable ? "\(result.ac.score) of 10" : "Not scored",
+                detail: result.ac.isScorable ? result.ac.band.rawValue : (result.ac.rejectionReason ?? "Out of model scope"),
+                tint: result.ac.isScorable ? Theme.severity(result.ac.band) : Theme.inkSoft,
+                symbol: "photo.stack"
+            ) { path.append(.ac(caseID)) }
 
             featureCard(
                 title: "3D view",
@@ -207,26 +199,6 @@ struct ResultSummaryView: View {
             .card(padding: 12)
         }
         .buttonStyle(.plain)
-    }
-
-    /// Honest placeholder for a feature the connected engine does not produce.
-    /// Shown as visibly inert so nobody reads it as a pending result.
-    private func unavailableCard(title: String, detail: String, symbol: String) -> some View {
-        HStack(spacing: 14) {
-            Image(systemName: symbol)
-                .font(.title3)
-                .foregroundStyle(Theme.inkSoft)
-                .frame(width: 40, height: 40)
-                .background(Theme.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.caption).foregroundStyle(Theme.inkSoft)
-                Text("Not available").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.inkSoft)
-                Text(detail).font(.caption2).foregroundStyle(Theme.inkSoft)
-            }
-            Spacer()
-        }
-        .card(padding: 12)
-        .opacity(0.7)
     }
 
     private func narrativeCard(_ text: String) -> some View {

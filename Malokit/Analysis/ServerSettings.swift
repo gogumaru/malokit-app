@@ -51,9 +51,13 @@ final class ServerSettings {
     }
 
     /// Builds the engine the pipeline should use, based on the current setting.
-    /// This is the single place that decides mock versus real.
+    /// This is the single place that decides mock versus real DHC.
+    ///
+    /// AC is a separate, on-device pipeline (`ACCoreMLEngine`) and always
+    /// runs regardless of this choice, so switching DHC between mock and the
+    /// real server never turns off the real aesthetic component score.
     func makeEngine() -> AnalysisEngine {
-        guard useRemote, isConfigured else { return MockEngine() }
-        return RemoteEngine(settings: self)
+        let dhcSource: AnalysisEngine = (useRemote && isConfigured) ? RemoteEngine(settings: self) : MockEngine()
+        return ACCoreMLEngine(fallback: dhcSource)
     }
 }

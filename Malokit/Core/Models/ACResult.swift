@@ -7,12 +7,18 @@ struct ACResult: Codable, Hashable {
     var confidence: Double
     /// Index 1 to 10 of the closest reference photograph.
     var nearestReference: Int
+    /// False when the Core ML model rejected the photo as out of
+    /// distribution (not a frontal intraoral photo). `score` and
+    /// `confidence` are not meaningful in that case.
+    var isScorable: Bool = true
+    /// Why the photo was rejected, shown to the user in place of a score.
+    var rejectionReason: String? = nil
 
     var band: SeverityBand {
         switch score {
-        case ...2: .noNeed
-        case 3...4: .littleNeed
-        case 5...7: .borderline
+        case ...1: .noNeed
+        case 2...3: .littleNeed
+        case 4...6: .borderline
         default: .definiteNeed
         }
     }

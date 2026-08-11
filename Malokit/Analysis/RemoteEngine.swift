@@ -106,7 +106,13 @@ struct RemoteEngine: AnalysisEngine {
         return AnalysisResult(
             angle: payload.angle,
             dhc: payload.dhc,
-            ac: nil,                    // separate pipeline, not this server
+            ac: ACResult(
+                score: 0,
+                confidence: 0,
+                nearestReference: 0,
+                isScorable: false,
+                rejectionReason: "This engine does not produce an aesthetic component score."
+            ),
             model3DFilename: nil,       // separate pipeline, not this server
             narrative: nil,             // report LLM not wired yet
             generatedAt: .now,

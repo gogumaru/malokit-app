@@ -124,7 +124,7 @@ private struct CaseRow: View {
             HStack(spacing: 6) {
                 Circle().fill(summaryTint(result.summary)).frame(width: 7, height: 7)
                 Text(result.summary.rawValue)
-                Text(". \(result.dhc.reliableCount)/6 reliable" + (result.ac.map { " . AC \($0.score)" } ?? ""))
+                Text(". \(result.dhc.reliableCount)/6 reliable" + (result.ac.isScorable ? " . AC \(result.ac.score)" : ""))
                     .foregroundStyle(Theme.inkSoft)
             }
             .font(.caption.weight(.medium))
