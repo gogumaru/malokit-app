@@ -22,7 +22,7 @@ struct ACDetailView: View {
                 }
                 .padding(20)
             } else {
-                Text("No aesthetic component for this case.")
+                Text("This case has no results yet.")
                     .foregroundStyle(Theme.inkSoft)
                     .padding(40)
             }
