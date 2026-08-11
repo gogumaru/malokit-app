@@ -1,7 +1,9 @@
 import SwiftUI
 
-/// The DHC screen reports MOCDO cases, not a 30 grade taxonomy. It shows
-/// which components were found, what each one measures, and which one won.
+/// Lists the six DHC parameters, each showing its reliability state as plainly
+/// as its value. The brief section 8 is emphatic: a not-computed result is
+/// normal and frequent, and a guard-flagged result must never look fine. This
+/// screen is built so those two states are impossible to miss.
 struct DHCDetailView: View {
     let caseID: UUID
     @Environment(CaseStore.self) private var store
@@ -11,139 +13,238 @@ struct DHCDetailView: View {
     var body: some View {
         ScrollView {
             if let dhc {
-                VStack(alignment: .leading, spacing: 16) {
-                    deciding(dhc)
-                    detectedSection(dhc)
-                    if !dhc.clearComponents.isEmpty {
-                        clearSection(dhc)
-                    }
-                    ruleNote
+                VStack(alignment: .leading, spacing: 12) {
+                    banner
+                    readingRow(.overjet, dhc.overjet)
+                    readingRow(.overbite, dhc.overbite)
+                    readingRow(.crossbiteAnterior, dhc.anteriorCrossbite)
+                    posteriorRow(dhc.posteriorCrossbite)
+                    missingRow(dhc.missing)
+                    crowdingRow(dhc.crowding)
+                    footnote
                 }
                 .padding(20)
             } else {
-                Text("No dental health component for this case.")
+                Text("No dental health parameters for this case.")
                     .foregroundStyle(Theme.inkSoft)
                     .padding(40)
             }
         }
         .screenBackground()
-        .navigationTitle("IOTN DHC")
+        .navigationTitle("DHC parameters")
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func deciding(_ dhc: DHCResult) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Eyebrow(text: "Deciding MOCDO case")
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
-                Text(dhc.decidingComponent.title)
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(Theme.ink)
-                Text(dhc.decidingComponent.letter)
-                    .font(.system(.caption, design: .monospaced).weight(.bold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6).padding(.vertical, 2)
-                    .background(Theme.severity(dhc.band), in: RoundedRectangle(cornerRadius: 5))
-            }
-
-            if let finding = dhc.decidingFinding {
-                Text(finding.reading)
-                    .font(.subheadline)
-                    .foregroundStyle(Theme.inkSoft)
-
-                if let mm = finding.millimetres {
-                    SeverityRuler(
-                        value: mm,
-                        range: 0...12,
-                        majorStep: 2,
-                        tint: Theme.severity(dhc.band),
-                        valueLabel: String(format: "%.1f mm", mm)
-                    )
-                    .padding(.top, 4)
-                }
-            }
-
-            Text(dhc.band.rawValue)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10).padding(.vertical, 5)
-                .background(Theme.severity(dhc.band), in: Capsule())
-        }
-        .card(padding: 20)
-    }
-
-    private func detectedSection(_ dhc: DHCResult) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Eyebrow(text: "Detected, \(dhc.detected.count) of 5 components")
-            ForEach(dhc.detected) { finding in
-                findingRow(finding, isDeciding: finding.component == dhc.decidingComponent)
-            }
-        }
-    }
-
-    private func findingRow(_ finding: MOCDOFinding, isDeciding: Bool) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: finding.component.symbol)
-                .font(.subheadline)
-                .foregroundStyle(Theme.severity(finding.band))
-                .frame(width: 34, height: 34)
-                .background(Theme.accentDim, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 6) {
-                    Text(finding.component.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(Theme.ink)
-                    if isDeciding {
-                        Text("decides")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 5).padding(.vertical, 1.5)
-                            .background(Theme.ink, in: Capsule())
-                    }
-                }
-                Text(finding.reading).font(.caption).foregroundStyle(Theme.inkSoft)
-                Text("Rule: \(finding.component.thresholdNote)")
-                    .font(.caption2)
-                    .foregroundStyle(Theme.inkSoft.opacity(0.75))
-            }
-
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(finding.measurementText)
-                    .font(.system(.subheadline, design: .rounded).weight(.bold))
-                    .monospacedDigit()
-                    .foregroundStyle(Theme.severity(finding.band))
-                Text("\(Int(finding.confidence * 100))%")
-                    .font(.caption2)
-                    .foregroundStyle(Theme.inkSoft)
-            }
+    private var banner: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "info.circle").foregroundStyle(Theme.accent)
+            Text("Each parameter stands alone. There is no combined grade. Values marked for review or not computed are normal outcomes, not errors.")
+                .font(.caption)
+                .foregroundStyle(Theme.inkSoft)
         }
         .card(padding: 12)
     }
 
-    private func clearSection(_ dhc: DHCResult) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Eyebrow(text: "Checked and clear")
-            ForEach(dhc.clearComponents) { component in
-                HStack(spacing: 10) {
-                    Image(systemName: "checkmark")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(Theme.calm)
-                    Text(component.title).font(.subheadline).foregroundStyle(Theme.ink)
-                    Spacer()
-                    Text(component.sourceViews.map(\.title).joined(separator: ", "))
+    // MARK: - Reliability badge, shared by every row
+
+    private func badge(_ reliability: Reliability) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: reliability.symbol)
+            Text(reliability.badgeText)
+        }
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.white)
+        .padding(.horizontal, 8).padding(.vertical, 3)
+        .background(reliability.tint, in: Capsule())
+    }
+
+    private func rowHeader(_ title: String, symbol: String, reliability: Reliability) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.subheadline)
+                .foregroundStyle(reliability.tint)
+                .frame(width: 32, height: 32)
+                .background(Theme.accentDim, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+            Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
+            Spacer()
+            badge(reliability)
+        }
+    }
+
+    private func warningLines(_ warnings: [String]) -> some View {
+        ForEach(warnings, id: \.self) { warning in
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.caption2)
+                    .foregroundStyle(Theme.watch)
+                Text(warning).font(.caption).foregroundStyle(Theme.inkSoft)
+            }
+        }
+    }
+
+    // MARK: - Simple numeric parameter (overjet, overbite, anterior crossbite)
+
+    private func readingRow(_ parameter: DHCParameter, _ reading: Reading) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            rowHeader(parameter.title, symbol: parameter.symbol, reliability: reading.reliability)
+
+            if reading.hasValue {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(reading.formatted())
+                        .font(.system(.title3, design: .rounded).weight(.bold))
+                        .monospacedDigit()
+                        .foregroundStyle(reading.reliability.tint)
+                    if let label = reading.label {
+                        Text(label).font(.caption).foregroundStyle(Theme.inkSoft)
+                    }
+                    if let side = reading.side {
+                        Spacer()
+                        Text(side).font(.caption2).foregroundStyle(Theme.inkSoft)
+                    }
+                }
+            } else {
+                notComputedBlock(parameter)
+            }
+
+            warningLines(reading.warnings)
+        }
+        .card(padding: 14)
+    }
+
+    /// The honest empty state. Points at the photos most likely responsible
+    /// rather than showing a blank or a zero.
+    private func notComputedBlock(_ parameter: DHCParameter) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("No value could be computed from the photos.")
+                .font(.caption)
+                .foregroundStyle(Theme.inkSoft)
+            Text("Reads from: \(parameter.sourceViews.map(\.title).joined(separator: ", "))")
+                .font(.caption2)
+                .foregroundStyle(Theme.inkSoft.opacity(0.8))
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    // MARK: - Posterior crossbite
+
+    private func posteriorRow(_ crossbite: CrossbitePosterior) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            rowHeader("Posterior crossbite",
+                      symbol: DHCParameter.crossbitePosterior.symbol,
+                      reliability: crossbite.reliability)
+
+            if crossbite.isPresent {
+                Text(crossbite.label ?? "Flagged")
+                    .font(.caption).foregroundStyle(Theme.ink)
+                ForEach(crossbite.flagged) { flag in
+                    Text("\(flag.side) side, position \(flag.position) . ratio \(String(format: "%.2f", flag.ratio))")
                         .font(.caption2)
                         .foregroundStyle(Theme.inkSoft)
                 }
-                .padding(.vertical, 2)
+            } else {
+                Text("None flagged.").font(.caption).foregroundStyle(Theme.inkSoft)
             }
         }
-        .card()
+        .card(padding: 14)
     }
 
-    private var ruleNote: some View {
-        Text("MOCDO takes one component only, the most severe. A mild finding on another component does not add to the score.")
+    // MARK: - Missing, two sources side by side
+
+    private func missingRow(_ missing: MissingReading) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                Image(systemName: DHCParameter.missing.symbol)
+                    .font(.subheadline)
+                    .foregroundStyle(missing.reliability.tint)
+                    .frame(width: 32, height: 32)
+                    .background(Theme.accentDim, in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+                Text("Missing teeth").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
+                Spacer()
+                badge(missing.reliability)
+            }
+
+            HStack(spacing: 16) {
+                sourceCount("Occlusal", missing.occlusalGaps, primary: true)
+                Divider().frame(height: 34)
+                sourceCount("Frontal", missing.frontalGaps, primary: false)
+                Spacer()
+            }
+
+            if missing.disagreement {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption2).foregroundStyle(Theme.watch)
+                    Text("Sources disagree. Occlusal is more trusted, but the gap needs a manual check.")
+                        .font(.caption).foregroundStyle(Theme.inkSoft)
+                }
+            }
+            warningLines(missing.warnings)
+        }
+        .card(padding: 14)
+    }
+
+    private func sourceCount(_ label: String, _ count: Int?, primary: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Text(label).font(.caption2).foregroundStyle(Theme.inkSoft)
+                if primary {
+                    Text("primary")
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 4).padding(.vertical, 1)
+                        .background(Theme.accent, in: Capsule())
+                }
+            }
+            Text(count.map { "\($0) gap\($0 == 1 ? "" : "s")" } ?? "—")
+                .font(.system(.subheadline, design: .rounded).weight(.bold))
+                .foregroundStyle(Theme.ink)
+        }
+    }
+
+    // MARK: - Crowding, per arch
+
+    private func crowdingRow(_ crowding: CrowdingReading) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Crowding").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
+            if let upper = crowding.upper { archBlock("Upper arch", upper) }
+            if let lower = crowding.lower { archBlock("Lower arch", lower) }
+            if crowding.upper == nil && crowding.lower == nil {
+                Text("Not computed.").font(.caption).foregroundStyle(Theme.inkSoft)
+            }
+        }
+        .card(padding: 14)
+    }
+
+    private func archBlock(_ label: String, _ arch: CrowdingArch) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                Text(label).font(.caption.weight(.semibold)).foregroundStyle(Theme.ink)
+                Spacer()
+                badge(arch.reliability)
+            }
+            HStack(spacing: 8) {
+                Text(arch.sum.map { String(format: "%.2f", $0) } ?? "—")
+                    .font(.system(.subheadline, design: .rounded).weight(.bold))
+                    .monospacedDigit()
+                    .foregroundStyle(arch.reliability.tint)
+                if let l = arch.label {
+                    Text(l).font(.caption).foregroundStyle(Theme.inkSoft)
+                }
+            }
+            if !arch.flaggedTeeth.isEmpty {
+                Text("Flagged teeth: \(arch.flaggedTeeth.map(String.init).joined(separator: ", "))")
+                    .font(.caption2).foregroundStyle(Theme.inkSoft)
+            }
+            warningLines(arch.warnings)
+        }
+        .padding(10)
+        .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    private var footnote: some View {
+        Text("Thresholds are calibrated on a small sample and are not clinical standards. Crowding is measured on the anterior segment only.")
             .font(.footnote)
             .foregroundStyle(Theme.inkSoft)
     }
