@@ -20,7 +20,7 @@ final class AnalysisPipeline {
     /// CoreMLEngine() once the models are ready.
     private let engine: AnalysisEngine
 
-    init(engine: AnalysisEngine = MockEngine()) {
+    init(engine: AnalysisEngine = ACCoreMLEngine()) {
         self.engine = engine
     }
 
