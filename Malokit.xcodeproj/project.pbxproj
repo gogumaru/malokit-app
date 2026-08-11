@@ -410,11 +410,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = J424AXQY5M;
+				DEVELOPMENT_TEAM = CXZM7CJ824;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Malokit/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Malokit uses the camera to capture the five intraoral views used for IOTN scoring.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Malokit sends intraoral photos to the analysis server running on your local network";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Import existing intraoral photos instead of shooting new ones.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -445,11 +446,12 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = J424AXQY5M;
+				DEVELOPMENT_TEAM = CXZM7CJ824;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Malokit/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "Malokit uses the camera to capture the five intraoral views used for IOTN scoring.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Malokit sends intraoral photos to the analysis server running on your local network";
 				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "Import existing intraoral photos instead of shooting new ones.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

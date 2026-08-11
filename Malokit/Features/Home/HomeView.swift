@@ -15,6 +15,11 @@ struct HomeView: View {
         .screenBackground()
         .navigationTitle("Malokit")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { path.append(.settings) } label: {
+                    Image(systemName: "gearshape")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: startCase) {
                     Label("New analysis", systemImage: "plus")
@@ -117,9 +122,9 @@ private struct CaseRow: View {
     private var statusLine: some View {
         if let result = record.result {
             HStack(spacing: 6) {
-                Circle().fill(Theme.severity(result.verdict)).frame(width: 7, height: 7)
-                Text(result.verdict.rawValue)
-                Text("DHC \(result.dhc.decidingComponent.title.lowercased()) . AC \(result.ac.score)")
+                Circle().fill(summaryTint(result.summary)).frame(width: 7, height: 7)
+                Text(result.summary.rawValue)
+                Text(". \(result.dhc.reliableCount)/6 reliable" + (result.ac.isScorable ? " . AC \(result.ac.score)" : ""))
                     .foregroundStyle(Theme.inkSoft)
             }
             .font(.caption.weight(.medium))
@@ -128,6 +133,15 @@ private struct CaseRow: View {
             Text("\(record.capturedViews.count) of 5 photos")
                 .font(.caption.weight(.medium))
                 .foregroundStyle(Theme.accent)
+        }
+    }
+
+    private func summaryTint(_ summary: AnalysisResult.CaseSummary) -> Color {
+        switch summary {
+        case .reviewNeeded:  Theme.watch
+        case .partialResult: Theme.inkSoft
+        case .findingsFound: Theme.ink
+        case .clear:         Theme.calm
         }
     }
 }

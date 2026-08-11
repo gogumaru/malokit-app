@@ -10,7 +10,7 @@ enum CaseStatus: String, Codable {
 
 /// Everything the pipeline produced for one patient, in one value type.
 struct AnalysisResult: Codable, Hashable {
-    var angle: AngleResult
+    var angle: AngleReading
     var dhc: DHCResult
     var ac: ACResult
     /// Filename of the reconstructed mesh inside the case folder, if any.
@@ -20,10 +20,29 @@ struct AnalysisResult: Codable, Hashable {
     var generatedAt: Date
     var engineName: String
 
-    /// The single verdict shown at the top of the summary. Either component
-    /// reaching definite need is enough to escalate the whole case.
-    var verdict: SeverityBand {
-        dhc.band.rank >= ac.band.rank ? dhc.band : ac.band
+    /// How the whole case reads at a glance. There is deliberately no single
+    /// IOTN grade here: the pipeline does not produce one yet (brief 8.7), so
+    /// the summary is honest about coverage instead of inventing a verdict.
+    enum CaseSummary: String {
+        case reviewNeeded   = "Review needed"
+        case partialResult  = "Partial result"
+        case findingsFound  = "Findings to review"
+        case clear          = "No findings flagged"
+    }
+
+    var summary: CaseSummary {
+        if dhc.hasAnyWarning || angle.disagreement || dhc.missing.disagreement {
+            return .reviewNeeded
+        }
+        if !dhc.notComputedParameters.isEmpty || !ac.isScorable {
+            return .partialResult
+        }
+        let anyFinding = dhc.posteriorCrossbite.isPresent
+            || (dhc.crowding.upper?.flaggedTeeth.isEmpty == false)
+            || (dhc.crowding.lower?.flaggedTeeth.isEmpty == false)
+            || (dhc.overjet.label?.isEmpty == false)
+            || ac.band != .noNeed
+        return anyFinding ? .findingsFound : .clear
     }
 }
 

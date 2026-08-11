@@ -16,15 +16,16 @@ final class AnalysisPipeline {
     var state: State = .idle
     var completedStages: Set<AnalysisStage> = []
 
-    /// The single swap point. Change this to RemoteEngine() or
-    /// CoreMLEngine() once the models are ready.
+    /// Injected by the caller from ServerSettings, so switching between the
+    /// mock and the real server is a setting rather than a code change.
     private let engine: AnalysisEngine
 
-    init(engine: AnalysisEngine = MockEngine()) {
+    init(engine: AnalysisEngine = ACCoreMLEngine()) {
         self.engine = engine
     }
 
     var engineName: String { engine.name }
+    var stages: [AnalysisStage] { engine.stages }
 
     func run(caseID: UUID, store: CaseStore) async {
         guard let record = store.record(caseID) else {
