@@ -3,6 +3,10 @@ import SwiftUI
 struct HomeView: View {
     @Binding var path: [Route]
     @Environment(CaseStore.self) private var store
+    
+    @State private var isNamingNewCase = false
+    @State private var pendingCaseID: UUID?
+    @State private var renamingCurrentName = ""
 
     var body: some View {
         Group {
@@ -27,6 +31,20 @@ struct HomeView: View {
             }
         }
         .onAppear { store.pruneEmptyDrafts() }
+        .caseNamePrompt(
+            isPresented: $isNamingNewCase,
+            title: renamingCurrentName.isEmpty ? "New case" : "Rename case",
+            currentName: renamingCurrentName
+        ) { name in
+            guard let id = pendingCaseID else { return }
+            store.rename(id, to: name)
+            // Only a brand new case continues into capture. Renaming an
+            // existing one should leave the person where they were.
+            if renamingCurrentName.isEmpty {
+                path.append(.capture(id))
+            }
+            renamingCurrentName = ""
+        }
     }
 
     private var empty: some View {
@@ -57,6 +75,11 @@ struct HomeView: View {
                     Button { open(record) } label: { CaseRow(record: record) }
                         .buttonStyle(.plain)
                         .contextMenu {
+                            Button("Rename") {
+                                pendingCaseID = record.id
+                                renamingCurrentName = record.label
+                                isNamingNewCase = true
+                            }
                             Button("Delete", role: .destructive) { store.delete(record.id) }
                         }
                 }
@@ -67,7 +90,8 @@ struct HomeView: View {
 
     private func startCase() {
         let record = store.createCase()
-        path.append(.capture(record.id))
+        pendingCaseID = record.id
+        isNamingNewCase = true
     }
 
     private func open(_ record: CaseRecord) {

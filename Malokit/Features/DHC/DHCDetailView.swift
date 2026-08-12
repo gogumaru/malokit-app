@@ -10,8 +10,23 @@ struct DHCDetailView: View {
 
     private var dhc: DHCResult? { store.record(caseID)?.result?.dhc }
 
+    @State private var inspecting: InspectTarget?
+
+    /// What the overlay sheet is currently showing. Identifiable so it can
+    /// drive a sheet item binding.
+    private struct InspectTarget: Identifiable {
+        let id = UUID()
+        let targets: [OverlayTarget]
+        let context: String
+    }
+
     var body: some View {
-        ScrollView {
+        // The content width is clamped to the screen rather than left to grow.
+        // `maxWidth: .infinity` only sets a floor: any child that insists on
+        // being wider still stretches the scroll content, and the whole page
+        // becomes draggable sideways. A hard width removes that possibility.
+        GeometryReader { geo in
+        ScrollView(.vertical) {
             if let dhc {
                 VStack(alignment: .leading, spacing: 12) {
                     banner
@@ -24,15 +39,25 @@ struct DHCDetailView: View {
                     footnote
                 }
                 .padding(20)
+                .frame(width: geo.size.width, alignment: .leading)
             } else {
                 Text("No dental health parameters for this case.")
                     .foregroundStyle(Theme.inkSoft)
                     .padding(40)
+                    .frame(width: geo.size.width)
             }
+        }
         }
         .screenBackground()
         .navigationTitle("DHC parameters")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $inspecting) { target in
+            OverlaySheet(
+                caseID: caseID,
+                targets: target.targets,
+                context: target.context
+            )
+        }
     }
 
     private var banner: some View {
@@ -71,6 +96,42 @@ struct DHCDetailView: View {
         }
     }
 
+    /// Opens the annotated photo behind a parameter.
+    ///
+    /// Only rendered when annotations exist for that parameter, so the app never
+    /// offers to show workings it does not have. This matters most for the
+    /// unreliable and not-computed cases: seeing that the model outlined a
+    /// fragment outside the mouth explains a bad number far better than a
+    /// warning sentence can.
+    @ViewBuilder
+    private func inspectButton(_ parameter: DHCParameter, context: String) -> some View {
+        let matches = dhc?.overlayTargets(for: parameter) ?? []
+        if !matches.isEmpty {
+            Button {
+                inspecting = InspectTarget(
+                    targets: matches.map { OverlayTarget(view: $0.view, overlay: $0.overlay) },
+                    context: context
+                )
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "viewfinder")
+                    Text(matches.count > 1
+                         ? "Show on \(matches.count) views"
+                         : "Show on \(matches[0].view.title.lowercased())")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right").font(.caption2)
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Theme.accent)
+                .padding(.top, 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     private func warningLines(_ warnings: [String]) -> some View {
         ForEach(warnings, id: \.self) { warning in
             HStack(alignment: .top, spacing: 6) {
@@ -94,21 +155,41 @@ struct DHCDetailView: View {
                         .font(.system(.title3, design: .rounded).weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(reading.reliability.tint)
+                        .layoutPriority(1)
                     if let label = reading.label {
-                        Text(label).font(.caption).foregroundStyle(Theme.inkSoft)
+                        Text(label)
+                            .font(.caption)
+                            .foregroundStyle(Theme.inkSoft)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    Spacer(minLength: 4)
                     if let side = reading.side {
-                        Spacer()
-                        Text(side).font(.caption2).foregroundStyle(Theme.inkSoft)
+                        Text(side)
+                            .font(.caption2)
+                            .foregroundStyle(Theme.inkSoft)
+                            .layoutPriority(1)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 notComputedBlock(parameter)
             }
 
             warningLines(reading.warnings)
+            inspectButton(parameter, context: contextLine(parameter, reading))
         }
         .card(padding: 14)
+    }
+
+    private func contextLine(_ parameter: DHCParameter, _ reading: Reading) -> String {
+        switch reading.reliability {
+        case .reliable:
+            "\(parameter.title): \(reading.formatted()). Check the outlines match the teeth."
+        case .unreliable:
+            "\(parameter.title) was flagged. Check whether the model outlined the right teeth."
+        case .notComputed:
+            "\(parameter.title) could not be computed. The detections below are what the model did find."
+        }
     }
 
     /// The honest empty state. Points at the photos most likely responsible
@@ -159,6 +240,8 @@ struct DHCDetailView: View {
             }
 
             warningLines(reading.warnings)
+            inspectButton(.crossbiteAnterior,
+                          context: "Derived from overjet, measured on the lateral views.")
         }
         .card(padding: 14)
     }
@@ -182,6 +265,9 @@ struct DHCDetailView: View {
             } else {
                 Text("None flagged.").font(.caption).foregroundStyle(Theme.inkSoft)
             }
+
+            inspectButton(.crossbitePosterior,
+                          context: "Posterior crossbite is read from the frontal view.")
         }
         .card(padding: 14)
     }
@@ -217,6 +303,12 @@ struct DHCDetailView: View {
                 }
             }
             warningLines(missing.warnings)
+            inspectButton(
+                .missing,
+                context: missing.disagreement
+                    ? "Occlusal and frontal disagree. Compare the gaps on both; the frontal view cannot see past the premolars."
+                    : "Occlusal is the primary source, frontal is the cross-check."
+            )
         }
         .card(padding: 14)
     }
@@ -244,8 +336,8 @@ struct DHCDetailView: View {
     private func crowdingRow(_ crowding: CrowdingReading) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Crowding").font(.subheadline.weight(.semibold)).foregroundStyle(Theme.ink)
-            if let upper = crowding.upper { archBlock("Upper arch", upper) }
-            if let lower = crowding.lower { archBlock("Lower arch", lower) }
+            if let upper = crowding.upper { archBlock("Upper arch", upper, view: .maxillary) }
+            if let lower = crowding.lower { archBlock("Lower arch", lower, view: .mandibular) }
             if crowding.upper == nil && crowding.lower == nil {
                 Text("Not computed.").font(.caption).foregroundStyle(Theme.inkSoft)
             }
@@ -253,7 +345,7 @@ struct DHCDetailView: View {
         .card(padding: 14)
     }
 
-    private func archBlock(_ label: String, _ arch: CrowdingArch) -> some View {
+    private func archBlock(_ label: String, _ arch: CrowdingArch, view: ToothView) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Text(label).font(.caption.weight(.semibold)).foregroundStyle(Theme.ink)
@@ -274,6 +366,26 @@ struct DHCDetailView: View {
                     .font(.caption2).foregroundStyle(Theme.inkSoft)
             }
             warningLines(arch.warnings)
+
+            if let overlay = dhc?.overlays?[view.wireName], !overlay.isEmpty {
+                Button {
+                    inspecting = InspectTarget(
+                        targets: [OverlayTarget(view: view, overlay: overlay)],
+                        context: "Flagged teeth are highlighted. The yellow line is the fitted arch curve."
+                    )
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "viewfinder")
+                        Text("Show flagged teeth").lineLimit(1)
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.right").font(.caption2)
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Theme.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding(10)
         .background(Theme.surface, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
