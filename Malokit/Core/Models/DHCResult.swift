@@ -232,10 +232,27 @@ struct DHCResult: Codable, Hashable {
     var missing: MissingReading
     var crowding: CrowdingReading
 
+    /// Annotation geometry per view, keyed by the wire field names.
+    ///
+    /// Optional so cases stored before overlays existed still decode, and so a
+    /// server that has not implemented them yet simply omits the key.
+    var overlays: OverlaySet?
+
     enum CodingKeys: String, CodingKey {
-        case overjet, overbite, missing, crowding
+        case overjet, overbite, missing, crowding, overlays
         case anteriorCrossbite = "anterior_crossbite"
         case posteriorCrossbite = "crossbite_posterior"
+    }
+
+    /// Annotations for the view a given parameter is measured from, if any.
+    func overlay(for parameter: DHCParameter) -> (view: ToothView, overlay: ViewOverlay)? {
+        guard let overlays else { return nil }
+        for view in parameter.sourceViews {
+            if let overlay = overlays[view.wireName], !overlay.isEmpty {
+                return (view, overlay)
+            }
+        }
+        return nil
     }
 
     /// How many of the six parameters produced a trustworthy value. Drives the

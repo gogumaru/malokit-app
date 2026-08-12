@@ -83,7 +83,8 @@ struct MockEngine: AnalysisEngine {
                     reliability: .unreliable,
                     warnings: ["Lower arch threshold not yet validated"]
                 )
-            )
+            ),
+            overlays: SampleOverlays.make()
         )
 
         // Angle: canine suggests Class III, molar could not be measured. Not a

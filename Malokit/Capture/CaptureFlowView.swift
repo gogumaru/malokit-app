@@ -10,6 +10,8 @@ struct CaptureFlowView: View {
     @State private var current: ToothView = .front
     @State private var flashFrame = false
     @State private var pickerItem: PhotosPickerItem?
+    /// Size of the live preview, needed to map the guide frame onto the photo.
+    @State private var previewSize: CGSize = .zero
 
     private var record: CaseRecord? { store.record(caseID) }
 
@@ -19,7 +21,13 @@ struct CaptureFlowView: View {
 
             switch camera.status {
             case .running:
-                CameraPreview(session: camera.session).ignoresSafeArea()
+                GeometryReader { geo in
+                    CameraPreview(session: camera.session)
+                        .onAppear { previewSize = geo.size }
+                        .onChange(of: geo.size) { _, newSize in previewSize = newSize }
+                }
+                .ignoresSafeArea()
+
                 GuideOverlay(view: current, isReady: camera.liveQuality?.isAcceptable ?? false)
                     .ignoresSafeArea()
             case .denied:
@@ -191,8 +199,17 @@ struct CaptureFlowView: View {
     }
 
     private func shoot() {
+        let guideRect = GuideFrame.rect(for: current, in: previewSize)
+        let size = previewSize
+
         camera.capturePhoto { image in
-            persist(image)
+            // Crop to what the person actually framed. Falls back to the full
+            // frame if the preview size is not known yet, so a photo is never
+            // lost to a layout race.
+            let framed = size == .zero
+                ? image
+                : Preprocessor.crop(image, guideRect: guideRect, previewSize: size)
+            persist(framed)
         }
     }
 
