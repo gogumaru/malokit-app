@@ -244,15 +244,24 @@ struct DHCResult: Codable, Hashable {
         case posteriorCrossbite = "crossbite_posterior"
     }
 
-    /// Annotations for the view a given parameter is measured from, if any.
-    func overlay(for parameter: DHCParameter) -> (view: ToothView, overlay: ViewOverlay)? {
-        guard let overlays else { return nil }
-        for view in parameter.sourceViews {
-            if let overlay = overlays[view.wireName], !overlay.isEmpty {
-                return (view, overlay)
-            }
+    /// Every annotated view a parameter is read from, in source order.
+    ///
+    /// Returns all of them rather than the first. Missing teeth is reported
+    /// from the occlusal and frontal views together, and the whole point of
+    /// the `disagreement` flag is that those two can differ. Showing one view
+    /// would hide exactly the case the flag exists for. Overjet and overbite
+    /// benefit the same way, since either lateral can be the clean one.
+    func overlayTargets(for parameter: DHCParameter) -> [(view: ToothView, overlay: ViewOverlay)] {
+        guard let overlays else { return [] }
+        return parameter.sourceViews.compactMap { view in
+            guard let overlay = overlays[view.wireName], !overlay.isEmpty else { return nil }
+            return (view, overlay)
         }
-        return nil
+    }
+
+    /// Convenience for callers that only need one view.
+    func overlay(for parameter: DHCParameter) -> (view: ToothView, overlay: ViewOverlay)? {
+        overlayTargets(for: parameter).first
     }
 
     /// How many of the six parameters produced a trustworthy value. Drives the

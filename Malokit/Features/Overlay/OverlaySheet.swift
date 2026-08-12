@@ -1,5 +1,12 @@
 import SwiftUI
 
+/// One annotated view: the photo plus its shapes.
+struct OverlayTarget: Identifiable, Hashable {
+    let id = UUID()
+    let view: ToothView
+    let overlay: ViewOverlay
+}
+
 /// Full screen annotation viewer, opened from a DHC parameter row.
 ///
 /// Layers are switchable because a single picture with everything drawn at once
@@ -8,14 +15,39 @@ import SwiftUI
 /// an overjet means looking at the anchor boxes that produced it.
 struct OverlaySheet: View {
     let caseID: UUID
-    let view: ToothView
-    let overlay: ViewOverlay
+    /// One entry per annotated view. More than one gets a picker, because some
+    /// parameters are genuinely read from several photos at once.
+    let targets: [OverlayTarget]
     /// What the reader came to check, shown above the photo.
     let context: String
 
     @Environment(\.dismiss) private var dismiss
     @State private var visibleRoles: Set<OverlayShape.Role> = []
     @State private var selected: OverlayShape?
+    @State private var index: Int = 0
+
+    init(caseID: UUID, targets: [OverlayTarget], context: String) {
+        self.caseID = caseID
+        self.targets = targets
+        self.context = context
+    }
+
+    /// Single view convenience.
+    init(caseID: UUID, view: ToothView, overlay: ViewOverlay, context: String) {
+        self.init(
+            caseID: caseID,
+            targets: [OverlayTarget(view: view, overlay: overlay)],
+            context: context
+        )
+    }
+
+    private var current: OverlayTarget? {
+        guard targets.indices.contains(index) else { return targets.first }
+        return targets[index]
+    }
+
+    private var view: ToothView { current?.view ?? .front }
+    private var overlay: ViewOverlay { current?.overlay ?? ViewOverlay(shapes: []) }
 
     private var image: UIImage? { ImageStore.load(caseID: caseID, view: view) }
 
@@ -48,15 +80,29 @@ struct OverlaySheet: View {
                 }
             }
         }
+        .onChange(of: index) { _, _ in
+            selected = nil
+            visibleRoles = Set(overlay.roles.filter { !$0.isHiddenByDefault })
+        }
         .onAppear {
-            // Everything on by default, so nothing is hidden without the reader
-            // choosing to hide it.
-            visibleRoles = Set(overlay.roles)
+            // Everything on by default except discarded masks, which are noise
+            // on a good case and only wanted when a reader is asking why a
+            // number went wrong.
+            visibleRoles = Set(overlay.roles.filter { !$0.isHiddenByDefault })
         }
     }
 
     private var controls: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if targets.count > 1 {
+                Picker("View", selection: $index) {
+                    ForEach(Array(targets.enumerated()), id: \.offset) { offset, target in
+                        Text(target.view.title).tag(offset)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
             Text(context)
                 .font(.caption)
                 .foregroundStyle(Theme.inkSoft)

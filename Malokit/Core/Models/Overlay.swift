@@ -36,19 +36,38 @@ struct OverlayShape: Codable, Hashable, Identifiable {
     enum Role: String, Codable, CaseIterable {
         case tooth
         case flagged
+        case crossbite
         case anchor
         case measurement
         case archCurve
         case gap
+        /// Masks the pipeline discarded: edge slivers and arch-curve outliers.
+        /// Off by default, because on a good case they are noise. On a bad one
+        /// they are the whole explanation.
+        case rejected
+        /// Anything this app version does not recognise. Drawn neutrally rather
+        /// than dropped, so a newer server can add roles without this app
+        /// silently losing shapes or refusing the whole response.
+        case unknown
+
+        /// Lenient decoding is the point: an unrecognised string becomes
+        /// `.unknown` instead of throwing and taking the entire analysis with it.
+        init(from decoder: Decoder) throws {
+            let raw = try decoder.singleValueContainer().decode(String.self)
+            self = Role(rawValue: raw) ?? .unknown
+        }
 
         var title: String {
             switch self {
             case .tooth:       "Segmentation"
             case .flagged:     "Flagged teeth"
+            case .crossbite:   "Crossbite"
             case .anchor:      "Detections"
             case .measurement: "Measurements"
             case .archCurve:   "Arch curve"
             case .gap:         "Gaps"
+            case .rejected:    "Discarded masks"
+            case .unknown:     "Other"
             }
         }
 
@@ -56,20 +75,36 @@ struct OverlayShape: Codable, Hashable, Identifiable {
             switch self {
             case .tooth:       Color(hex: 0x2BC4C4)
             case .flagged:     Color(hex: 0xF08A24)
+            case .crossbite:   Color(hex: 0x3B7DD8)
             case .anchor:      Color(hex: 0xD94BC4)
             case .measurement: Color(hex: 0xE03B3B)
             case .archCurve:   Color(hex: 0xF2C230)
             case .gap:         Color(hex: 0xE03B3B)
+            case .rejected:    Color(hex: 0x9AA5A3)
+            case .unknown:     Color(hex: 0x9AA5A3)
             }
         }
 
         var lineWidth: CGFloat {
             switch self {
-            case .tooth, .anchor: 1.6
-            case .flagged:        2.4
+            case .tooth, .anchor, .unknown: 1.6
+            case .flagged, .crossbite:      2.4
+            case .rejected:                 1.4
             case .measurement, .gap, .archCurve: 2.0
             }
         }
+
+        /// Discarded and unrecognised shapes are dashed, so they read as
+        /// "context" rather than as a finding even before the legend is read.
+        var dash: [CGFloat] {
+            switch self {
+            case .rejected, .unknown: [4, 3]
+            default: []
+            }
+        }
+
+        /// Shown only when the reader asks. Everything else starts visible.
+        var isHiddenByDefault: Bool { self == .rejected }
     }
 
     enum CodingKeys: String, CodingKey {
@@ -78,8 +113,30 @@ struct OverlayShape: Codable, Hashable, Identifiable {
 }
 
 /// All annotations for one captured view.
+///
+/// Malformed shapes are skipped instead of failing the response. One bad
+/// polygon should cost one polygon, not the patient's whole analysis.
 struct ViewOverlay: Codable, Hashable {
     var shapes: [OverlayShape]
+
+    init(shapes: [OverlayShape]) {
+        self.shapes = shapes
+    }
+
+    private struct Lossy: Decodable {
+        let shape: OverlayShape?
+        init(from decoder: Decoder) throws {
+            shape = try? OverlayShape(from: decoder)
+        }
+    }
+
+    enum CodingKeys: String, CodingKey { case shapes }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let lossy = try c.decodeIfPresent([Lossy].self, forKey: .shapes) ?? []
+        shapes = lossy.compactMap(\.shape)
+    }
 
     var roles: [OverlayShape.Role] {
         OverlayShape.Role.allCases.filter { role in

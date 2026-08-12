@@ -16,13 +16,17 @@ struct DHCDetailView: View {
     /// drive a sheet item binding.
     private struct InspectTarget: Identifiable {
         let id = UUID()
-        let view: ToothView
-        let overlay: ViewOverlay
+        let targets: [OverlayTarget]
         let context: String
     }
 
     var body: some View {
-        ScrollView {
+        // The content width is clamped to the screen rather than left to grow.
+        // `maxWidth: .infinity` only sets a floor: any child that insists on
+        // being wider still stretches the scroll content, and the whole page
+        // becomes draggable sideways. A hard width removes that possibility.
+        GeometryReader { geo in
+        ScrollView(.vertical) {
             if let dhc {
                 VStack(alignment: .leading, spacing: 12) {
                     banner
@@ -35,11 +39,14 @@ struct DHCDetailView: View {
                     footnote
                 }
                 .padding(20)
+                .frame(width: geo.size.width, alignment: .leading)
             } else {
                 Text("No dental health parameters for this case.")
                     .foregroundStyle(Theme.inkSoft)
                     .padding(40)
+                    .frame(width: geo.size.width)
             }
+        }
         }
         .screenBackground()
         .navigationTitle("DHC parameters")
@@ -47,8 +54,7 @@ struct DHCDetailView: View {
         .sheet(item: $inspecting) { target in
             OverlaySheet(
                 caseID: caseID,
-                view: target.view,
-                overlay: target.overlay,
+                targets: target.targets,
                 context: target.context
             )
         }
@@ -99,23 +105,28 @@ struct DHCDetailView: View {
     /// warning sentence can.
     @ViewBuilder
     private func inspectButton(_ parameter: DHCParameter, context: String) -> some View {
-        if let match = dhc?.overlay(for: parameter) {
+        let matches = dhc?.overlayTargets(for: parameter) ?? []
+        if !matches.isEmpty {
             Button {
                 inspecting = InspectTarget(
-                    view: match.view,
-                    overlay: match.overlay,
+                    targets: matches.map { OverlayTarget(view: $0.view, overlay: $0.overlay) },
                     context: context
                 )
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "viewfinder")
-                    Text("Show on \(match.view.title.lowercased())")
-                    Spacer()
+                    Text(matches.count > 1
+                         ? "Show on \(matches.count) views"
+                         : "Show on \(matches[0].view.title.lowercased())")
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                    Spacer(minLength: 4)
                     Image(systemName: "chevron.right").font(.caption2)
                 }
                 .font(.caption.weight(.medium))
                 .foregroundStyle(Theme.accent)
                 .padding(.top, 2)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .buttonStyle(.plain)
         }
@@ -144,14 +155,22 @@ struct DHCDetailView: View {
                         .font(.system(.title3, design: .rounded).weight(.bold))
                         .monospacedDigit()
                         .foregroundStyle(reading.reliability.tint)
+                        .layoutPriority(1)
                     if let label = reading.label {
-                        Text(label).font(.caption).foregroundStyle(Theme.inkSoft)
+                        Text(label)
+                            .font(.caption)
+                            .foregroundStyle(Theme.inkSoft)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                    Spacer(minLength: 4)
                     if let side = reading.side {
-                        Spacer()
-                        Text(side).font(.caption2).foregroundStyle(Theme.inkSoft)
+                        Text(side)
+                            .font(.caption2)
+                            .foregroundStyle(Theme.inkSoft)
+                            .layoutPriority(1)
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 notComputedBlock(parameter)
             }
@@ -284,7 +303,12 @@ struct DHCDetailView: View {
                 }
             }
             warningLines(missing.warnings)
-            inspectButton(.missing, context: "Gaps found on the occlusal view.")
+            inspectButton(
+                .missing,
+                context: missing.disagreement
+                    ? "Occlusal and frontal disagree. Compare the gaps on both; the frontal view cannot see past the premolars."
+                    : "Occlusal is the primary source, frontal is the cross-check."
+            )
         }
         .card(padding: 14)
     }
@@ -346,19 +370,19 @@ struct DHCDetailView: View {
             if let overlay = dhc?.overlays?[view.wireName], !overlay.isEmpty {
                 Button {
                     inspecting = InspectTarget(
-                        view: view,
-                        overlay: overlay,
+                        targets: [OverlayTarget(view: view, overlay: overlay)],
                         context: "Flagged teeth are highlighted. The yellow line is the fitted arch curve."
                     )
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "viewfinder")
-                        Text("Show flagged teeth")
-                        Spacer()
+                        Text("Show flagged teeth").lineLimit(1)
+                        Spacer(minLength: 4)
                         Image(systemName: "chevron.right").font(.caption2)
                     }
                     .font(.caption.weight(.medium))
                     .foregroundStyle(Theme.accent)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
             }

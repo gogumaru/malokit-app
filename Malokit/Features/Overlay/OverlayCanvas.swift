@@ -101,7 +101,14 @@ struct OverlayCanvas: View {
         if isSelected {
             context.fill(path, with: .color(tint.opacity(0.28)))
         }
-        context.stroke(path, with: .color(tint), lineWidth: width)
+        context.stroke(
+            path,
+            with: .color(tint),
+            style: StrokeStyle(
+                lineWidth: width,
+                dash: shape.role.dash.map { $0 / max(zoom * pinchZoom, 1) }
+            )
+        )
 
         if let label = shape.label {
             let centre = centroid(points)
