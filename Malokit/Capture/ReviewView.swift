@@ -9,7 +9,13 @@ struct ReviewView: View {
 
     @Environment(CaseStore.self) private var store
     @State private var readings: [ToothView: QualityReading] = [:]
+    @State private var validations: [ToothView: ViewValidation] = [:]
     @State private var isRenaming = false
+
+    /// `nil` when the model is missing from the bundle or fails to load —
+    /// the view-match badge is simply omitted in that case, same fail-open
+    /// spirit as `CaptureFlowView`.
+    private let validator = try? ViewValidatorRegressor()
 
     private var record: CaseRecord? { store.record(caseID) }
 
@@ -67,6 +73,7 @@ struct ReviewView: View {
         let filename = record?.filename(for: view)
         let image = filename.flatMap { ImageStore.load(caseID: caseID, filename: $0) }
         let reading = readings[view]
+        let validation = validations[view]
 
         return HStack(spacing: 14) {
             Group {
@@ -90,6 +97,13 @@ struct ReviewView: View {
 
                 if image == nil {
                     Text("Not captured").font(.caption).foregroundStyle(Theme.urgent)
+                } else if let validation, !validation.isValid {
+                    HStack(spacing: 5) {
+                        Circle().fill(Theme.urgent).frame(width: 7, height: 7)
+                        Text(mismatchSummary(validation))
+                            .font(.caption)
+                            .foregroundStyle(Theme.inkSoft)
+                    }
                 } else if let reading {
                     HStack(spacing: 5) {
                         Circle()
@@ -111,6 +125,7 @@ struct ReviewView: View {
             Button(image == nil ? "Shoot" : "Retake") {
                 if image != nil { store.clearImage(view, in: caseID) }
                 readings[view] = nil
+                validations[view] = nil
                 path.append(.capture(caseID))
             }
             .font(.footnote.weight(.semibold))
@@ -118,6 +133,15 @@ struct ReviewView: View {
             .tint(Theme.accent)
         }
         .card(padding: 12)
+    }
+
+    /// Short badge text for a failed view-match, distinct from the sharpness/
+    /// brightness wording `QualityReading.summary` already covers.
+    private func mismatchSummary(_ validation: ViewValidation) -> String {
+        guard let detected = validation.detectedView else {
+            return "Not a valid intraoral photo"
+        }
+        return validation.matchesExpected ? "Unclear shot" : "Looks like \(detected.title)"
     }
 
     private var runBar: some View {
@@ -150,10 +174,15 @@ struct ReviewView: View {
         for view in ToothView.allCases {
             guard
                 let filename = record.filename(for: view),
-                let image = ImageStore.load(caseID: caseID, filename: filename),
-                let reading = QualityChecker.evaluate(image: image)
+                let image = ImageStore.load(caseID: caseID, filename: filename)
             else { continue }
-            readings[view] = reading
+
+            if let reading = QualityChecker.evaluate(image: image) {
+                readings[view] = reading
+            }
+            if let validator, let validation = try? validator.validate(image: image, expected: view) {
+                validations[view] = validation
+            }
         }
     }
 }

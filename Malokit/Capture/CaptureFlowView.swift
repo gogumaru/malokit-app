@@ -13,6 +13,14 @@ struct CaptureFlowView: View {
     /// Size of the live preview, needed to map the guide frame onto the photo.
     @State private var previewSize: CGSize = .zero
 
+    /// `nil` when the model is missing from the bundle or fails to load, in
+    /// which case capture falls back to accepting every photo unvalidated
+    /// (same fail-open behaviour `ACCoreMLEngine` uses when its model is
+    /// absent) rather than blocking capture entirely.
+    @State private var validator: ViewValidatorRegressor? = try? ViewValidatorRegressor()
+    @State private var rejection: ViewValidation?
+    @State private var showRejection = false
+
     private var record: CaseRecord? { store.record(caseID) }
 
     var body: some View {
@@ -73,6 +81,11 @@ struct CaptureFlowView: View {
         .onChange(of: pickerItem) { _, item in
             guard let item else { return }
             Task { await importFromLibrary(item) }
+        }
+        .alert("Wrong photo for this step", isPresented: $showRejection, presenting: rejection) { _ in
+            Button("Retake", role: .cancel) {}
+        } message: { rejection in
+            Text(rejection.rejectionReason ?? "This photo doesn't match the current step.")
         }
     }
 
@@ -224,13 +237,42 @@ struct CaptureFlowView: View {
         }
     }
 
+    /// Gate before a photo is attached to the case: checks it against the
+    /// step it was shot for, so a tertukar slot or an out-of-scope photo
+    /// never silently reaches DHC/AC/3D. Falls back to accepting the photo
+    /// when the model is unavailable rather than blocking capture — see
+    /// `validator`'s doc comment.
     private func persist(_ image: UIImage) {
+        let prepared = Preprocessor.prepare(image)
+
+        guard let validator else {
+            commit(prepared)
+            return
+        }
+
+        do {
+            let result = try validator.validate(image: prepared, expected: current)
+            guard result.isValid else {
+                rejection = result
+                showRejection = true
+                return
+            }
+        } catch {
+            // Inference failed for this one photo: don't block the person
+            // over a transient model error, same fail-open spirit as a
+            // missing model.
+        }
+
+        commit(prepared)
+    }
+
+    private func commit(_ image: UIImage) {
         withAnimation(.easeOut(duration: 0.08)) { flashFrame = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.09) {
             withAnimation(.easeIn(duration: 0.18)) { flashFrame = false }
         }
 
-        store.attach(Preprocessor.prepare(image), to: caseID, view: current)
+        store.attach(image, to: caseID, view: current)
 
         if let next = store.record(caseID)?.nextViewToCapture {
             current = next
