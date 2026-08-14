@@ -18,6 +18,7 @@ struct DHCDetailView: View {
         let id = UUID()
         let targets: [OverlayTarget]
         let context: String
+        let parameter: String?
     }
 
     var body: some View {
@@ -55,7 +56,8 @@ struct DHCDetailView: View {
             OverlaySheet(
                 caseID: caseID,
                 targets: target.targets,
-                context: target.context
+                context: target.context,
+                parameter: target.parameter
             )
         }
     }
@@ -110,7 +112,8 @@ struct DHCDetailView: View {
             Button {
                 inspecting = InspectTarget(
                     targets: matches.map { OverlayTarget(view: $0.view, overlay: $0.overlay) },
-                    context: context
+                    context: context,
+                    parameter: parameter.responseKey
                 )
             } label: {
                 HStack(spacing: 6) {
@@ -371,7 +374,8 @@ struct DHCDetailView: View {
                 Button {
                     inspecting = InspectTarget(
                         targets: [OverlayTarget(view: view, overlay: overlay)],
-                        context: "Flagged teeth are highlighted. The yellow line is the fitted arch curve."
+                        context: "Flagged teeth are highlighted. The yellow line is the fitted arch curve.",
+                        parameter: DHCParameter.crowding.responseKey
                     )
                 } label: {
                     HStack(spacing: 6) {

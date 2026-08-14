@@ -33,8 +33,7 @@ enum SampleOverlays {
             shapes.append(OverlayShape(
                 kind: .polygon,
                 role: .tooth,
-                points: toothPolygon(cx: mirrored ? 1 - x : x, cy: cy, w: width, h: height),
-                label: nil
+                points: toothPolygon(cx: mirrored ? 1 - x : x, cy: cy, w: width, h: height)
             ))
         }
 
@@ -43,19 +42,30 @@ enum SampleOverlays {
         shapes.append(OverlayShape(
             kind: .box, role: .anchor,
             points: [NormalizedPoint(anchorX - 0.045, 0.38), NormalizedPoint(anchorX + 0.045, 0.62)],
-            label: "canine"
+            label: "canine",
+            params: ["angle"]
         ))
         shapes.append(OverlayShape(
             kind: .box, role: .anchor,
             points: [NormalizedPoint(anchorX + 0.05, 0.40), NormalizedPoint(anchorX + 0.13, 0.60)],
-            label: nil
+            label: "distal",
+            params: ["angle"]
+        ))
+        // The incisor is the denominator behind overjet and overbite. Without
+        // it on screen there is no way to see that the wrong tooth was used.
+        shapes.append(OverlayShape(
+            kind: .box, role: .reference,
+            points: [NormalizedPoint(anchorX + 0.14, 0.39), NormalizedPoint(anchorX + 0.21, 0.61)],
+            label: "incisor",
+            params: ["overjet", "overbite", "anterior_crossbite"]
         ))
 
         // The measured horizontal distance.
         shapes.append(OverlayShape(
             kind: .line, role: .measurement,
             points: [NormalizedPoint(anchorX, 0.47), NormalizedPoint(anchorX + 0.085, 0.47)],
-            label: "0.62"
+            label: "0.62",
+            params: ["overjet", "overbite", "anterior_crossbite"]
         ))
 
         return ViewOverlay(shapes: shapes)
@@ -72,20 +82,21 @@ enum SampleOverlays {
             let height = 0.20 - abs(t - 0.5) * 0.06
             shapes.append(OverlayShape(
                 kind: .polygon, role: .tooth,
-                points: toothPolygon(cx: x, cy: 0.50, w: 0.055, h: height),
-                label: nil
+                points: toothPolygon(cx: x, cy: 0.50, w: 0.055, h: height)
             ))
         }
 
         shapes.append(OverlayShape(
             kind: .line, role: .gap,
             points: [NormalizedPoint(0.30, 0.40), NormalizedPoint(0.30, 0.60)],
-            label: "gap"
+            label: "gap",
+            params: ["missing"]
         ))
         shapes.append(OverlayShape(
             kind: .box, role: .flagged,
             points: [NormalizedPoint(0.72, 0.42), NormalizedPoint(0.80, 0.58)],
-            label: "crossbite"
+            label: "crossbite",
+            params: ["crossbite_posterior"]
         ))
 
         return ViewOverlay(shapes: shapes)
@@ -115,13 +126,22 @@ enum SampleOverlays {
                 kind: .polygon,
                 role: isFlagged ? .flagged : .tooth,
                 points: toothPolygon(cx: cx, cy: cy, w: 0.075, h: 0.085),
-                label: isFlagged ? "\(position)" : nil
+                label: isFlagged ? "\(position)" : nil,
+                params: isFlagged ? ["crowding"] : []
             ))
         }
 
         shapes.insert(OverlayShape(
-            kind: .line, role: .archCurve, points: curve, label: nil
+            kind: .line, role: .archCurve, points: curve
         ), at: 0)
+
+        // A discarded sliver near the frame edge, hidden by default. This is
+        // the shape that explains an implausible measurement when one appears.
+        shapes.append(OverlayShape(
+            kind: .polygon, role: .rejected,
+            points: toothPolygon(cx: 0.08, cy: 0.20, w: 0.05, h: 0.04),
+            label: nil
+        ))
 
         return ViewOverlay(shapes: shapes)
     }

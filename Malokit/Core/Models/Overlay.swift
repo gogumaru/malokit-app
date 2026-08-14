@@ -21,6 +21,15 @@ struct OverlayShape: Codable, Hashable, Identifiable {
     var points: [NormalizedPoint]
     /// Short caption drawn at the shape's centre, for example a tooth index.
     var label: String?
+    /// Which reported parameters this shape helps check, using the response
+    /// keys verbatim. Empty means always relevant, which is how outlines and
+    /// the arch curve stay on screen as context.
+    ///
+    /// Separate from `role` on purpose: `role` answers "what is this" and picks
+    /// the colour, `params` answers "what does this help check" and drives
+    /// filtering. One incisor box serves overjet, overbite and anterior
+    /// crossbite at once, which no amount of role splitting can express.
+    var params: [String]
 
     enum Kind: String, Codable {
         case polygon
@@ -37,7 +46,14 @@ struct OverlayShape: Codable, Hashable, Identifiable {
         case tooth
         case flagged
         case crossbite
+        /// Raw detector output.
         case anchor
+        /// The tooth the measurement was actually taken from. Kept apart from
+        /// `anchor` because the two can disagree, and when they do, seeing two
+        /// colours fail to overlap is the fastest way to spot it. The incisor
+        /// is the denominator behind every overjet and overbite figure, so
+        /// being unable to pick it out was a real gap.
+        case reference
         case measurement
         case archCurve
         case gap
@@ -63,6 +79,7 @@ struct OverlayShape: Codable, Hashable, Identifiable {
             case .flagged:     "Flagged teeth"
             case .crossbite:   "Crossbite"
             case .anchor:      "Detections"
+            case .reference:   "Measured from"
             case .measurement: "Measurements"
             case .archCurve:   "Arch curve"
             case .gap:         "Gaps"
@@ -77,6 +94,7 @@ struct OverlayShape: Codable, Hashable, Identifiable {
             case .flagged:     Color(hex: 0xF08A24)
             case .crossbite:   Color(hex: 0x3B7DD8)
             case .anchor:      Color(hex: 0xD94BC4)
+            case .reference:   Color(hex: 0x2E9E5B)
             case .measurement: Color(hex: 0xE03B3B)
             case .archCurve:   Color(hex: 0xF2C230)
             case .gap:         Color(hex: 0xE03B3B)
@@ -89,6 +107,7 @@ struct OverlayShape: Codable, Hashable, Identifiable {
             switch self {
             case .tooth, .anchor, .unknown: 1.6
             case .flagged, .crossbite:      2.4
+            case .reference:                2.2
             case .rejected:                 1.4
             case .measurement, .gap, .archCurve: 2.0
             }
@@ -108,7 +127,40 @@ struct OverlayShape: Codable, Hashable, Identifiable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case kind, role, points, label
+        case kind, role, points, label, params
+    }
+
+    init(
+        kind: Kind,
+        role: Role,
+        points: [NormalizedPoint],
+        label: String? = nil,
+        params: [String] = []
+    ) {
+        self.kind = kind
+        self.role = role
+        self.points = points
+        self.label = label
+        self.params = params
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        kind = try c.decode(Kind.self, forKey: .kind)
+        role = try c.decode(Role.self, forKey: .role)
+        points = try c.decode([NormalizedPoint].self, forKey: .points)
+        label = try c.decodeIfPresent(String.self, forKey: .label)
+        // Absent means "no filtering information", which must behave exactly
+        // like today: the shape is always shown. A server that has not shipped
+        // params yet keeps working unchanged.
+        params = try c.decodeIfPresent([String].self, forKey: .params) ?? []
+    }
+
+    /// Whether this shape belongs on screen while `parameter` is being read.
+    /// A shape with no params is context and always shows.
+    func isRelevant(to parameter: String?) -> Bool {
+        guard let parameter, !params.isEmpty else { return true }
+        return params.contains(parameter)
     }
 }
 
@@ -142,6 +194,30 @@ struct ViewOverlay: Codable, Hashable {
         OverlayShape.Role.allCases.filter { role in
             shapes.contains { $0.role == role }
         }
+    }
+
+    /// Shapes worth showing while `parameter` is being read.
+    func shapes(for parameter: String?) -> [OverlayShape] {
+        shapes.filter { $0.isRelevant(to: parameter) }
+    }
+
+    /// Whether anything specific to this parameter exists at all.
+    ///
+    /// A parameter whose result is normal has no shapes of its own: only the
+    /// segmentation outlines that serve as context. On screen that is
+    /// indistinguishable from annotations having failed to load, so the viewer
+    /// needs to say which it is.
+    func hasParameterShapes(for parameter: String?) -> Bool {
+        shapes(for: parameter).contains { !$0.params.isEmpty }
+    }
+
+    /// True when filtering would actually hide something. Drives whether the
+    /// "show everything" toggle is offered at all, so it does not appear on
+    /// views where it would do nothing.
+    func hasFilterableContent(for parameter: String?) -> Bool {
+        guard parameter != nil else { return false }
+        return shapes.contains { !$0.params.isEmpty }
+            && shapes(for: parameter).count < shapes.count
     }
 
     var isEmpty: Bool { shapes.isEmpty }

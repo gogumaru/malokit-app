@@ -20,25 +20,44 @@ struct OverlaySheet: View {
     let targets: [OverlayTarget]
     /// What the reader came to check, shown above the photo.
     let context: String
+    /// Response key of the parameter being inspected, used to filter shapes.
+    /// Nil means show everything, which is what the Angle card did before
+    /// filtering existed.
+    let parameter: String?
 
     @Environment(\.dismiss) private var dismiss
     @State private var visibleRoles: Set<OverlayShape.Role> = []
     @State private var selected: OverlayShape?
     @State private var index: Int = 0
+    @State private var showEverything = false
 
-    init(caseID: UUID, targets: [OverlayTarget], context: String) {
+    init(caseID: UUID, targets: [OverlayTarget], context: String, parameter: String? = nil) {
         self.caseID = caseID
         self.targets = targets
         self.context = context
+        self.parameter = parameter
     }
 
     /// Single view convenience.
-    init(caseID: UUID, view: ToothView, overlay: ViewOverlay, context: String) {
+    init(caseID: UUID, view: ToothView, overlay: ViewOverlay, context: String, parameter: String? = nil) {
         self.init(
             caseID: caseID,
             targets: [OverlayTarget(view: view, overlay: overlay)],
-            context: context
+            context: context,
+            parameter: parameter
         )
+    }
+
+    /// The overlay actually drawn: filtered to the parameter unless the reader
+    /// asked for everything.
+    private var visibleOverlay: ViewOverlay {
+        showEverything
+            ? overlay
+            : ViewOverlay(shapes: overlay.shapes(for: parameter))
+    }
+
+    private var canShowMore: Bool {
+        overlay.hasFilterableContent(for: parameter)
     }
 
     private var current: OverlayTarget? {
@@ -57,7 +76,7 @@ struct OverlaySheet: View {
                 if let image {
                     OverlayCanvas(
                         image: image,
-                        overlay: overlay,
+                        overlay: visibleOverlay,
                         visibleRoles: visibleRoles,
                         selected: $selected
                     )
@@ -82,13 +101,17 @@ struct OverlaySheet: View {
         }
         .onChange(of: index) { _, _ in
             selected = nil
-            visibleRoles = Set(overlay.roles.filter { !$0.isHiddenByDefault })
+            visibleRoles = Set(visibleOverlay.roles.filter { !$0.isHiddenByDefault })
+        }
+        .onChange(of: showEverything) { _, _ in
+            selected = nil
+            visibleRoles = Set(visibleOverlay.roles.filter { !$0.isHiddenByDefault })
         }
         .onAppear {
             // Everything on by default except discarded masks, which are noise
             // on a good case and only wanted when a reader is asking why a
             // number went wrong.
-            visibleRoles = Set(overlay.roles.filter { !$0.isHiddenByDefault })
+            visibleRoles = Set(visibleOverlay.roles.filter { !$0.isHiddenByDefault })
         }
     }
 
@@ -124,11 +147,35 @@ struct OverlaySheet: View {
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(overlay.roles, id: \.self) { role in
+                    ForEach(visibleOverlay.roles, id: \.self) { role in
                         layerChip(role)
                     }
                 }
                 .padding(.vertical, 2)
+            }
+
+            // Nothing highlighted is a result, not a malfunction. Say so.
+            if parameter != nil, !showEverything, !visibleOverlay.hasParameterShapes(for: parameter) {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "checkmark.circle")
+                    Text("Nothing was flagged for this parameter. The outlines show what the model segmented.")
+                }
+                .font(.caption)
+                .foregroundStyle(Theme.calm)
+            }
+
+            // Filtering has to be visible. A screen that quietly shows a subset
+            // invites the reader to assume that is everything there is.
+            if canShowMore {
+                Toggle(isOn: $showEverything) {
+                    Text(showEverything
+                         ? "Showing every annotation"
+                         : "Showing only what this parameter uses")
+                        .font(.caption)
+                        .foregroundStyle(Theme.inkSoft)
+                }
+                .toggleStyle(.switch)
+                .tint(Theme.accent)
             }
 
             Text("Pinch to zoom, tap a shape to identify it. Outlines come from the model, not from a clinician.")
