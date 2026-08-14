@@ -28,6 +28,19 @@ enum DHCParameter: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// The key this parameter uses in the server response, reused verbatim as
+    /// the `params` value so no translation table exists on either side.
+    var responseKey: String {
+        switch self {
+        case .overjet:            "overjet"
+        case .overbite:           "overbite"
+        case .crossbiteAnterior:  "anterior_crossbite"
+        case .crossbitePosterior: "crossbite_posterior"
+        case .missing:            "missing"
+        case .crowding:           "crowding"
+        }
+    }
+
     var symbol: String {
         switch self {
         case .overjet:            "arrow.left.and.right"
