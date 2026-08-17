@@ -10,6 +10,7 @@ struct ReviewView: View {
     @Environment(CaseStore.self) private var store
     @State private var readings: [ToothView: QualityReading] = [:]
     @State private var storageError: String?
+    @State private var isRenaming = false
 
     private var record: CaseRecord? { store.record(caseID) }
 
@@ -34,6 +35,13 @@ struct ReviewView: View {
         .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom) { runBar }
         .task { await measureAll() }
+        .caseNamePrompt(
+            isPresented: $isRenaming,
+            currentName: record?.label ?? ""
+        ) { newName in
+            do { try store.rename(caseID, to: newName) }
+            catch { storageError = error.localizedDescription }
+        }
         .alert("Could not update this case", isPresented: .init(
             get: { storageError != nil },
             set: { if !$0 { storageError = nil } }
@@ -46,7 +54,19 @@ struct ReviewView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Eyebrow(text: record?.label ?? "Case")
+            Button {
+                isRenaming = true
+            } label: {
+                HStack(spacing: 5) {
+                    Text(record?.label ?? "Case")
+                        .font(.caption2.weight(.semibold))
+                        .tracking(1.2)
+                    Image(systemName: "pencil").font(.caption2)
+                }
+                .foregroundStyle(Theme.accent)
+            }
+            .buttonStyle(.plain)
+
             Text("\(record?.capturedViews.count ?? 0) of 5 captured")
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(Theme.ink)

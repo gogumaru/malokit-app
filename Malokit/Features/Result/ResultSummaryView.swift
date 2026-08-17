@@ -8,6 +8,15 @@ struct ResultSummaryView: View {
     @Environment(ServerSettings.self) private var settings
     @Environment(ReconstructionService.self) private var reconstructionService
 
+    @State private var inspectingAngle: AngleInspection?
+
+    private struct AngleInspection: Identifiable {
+        let id = UUID()
+        let view: ToothView
+        let overlay: ViewOverlay
+        let context: String
+    }
+
     private var record: CaseRecord? { store.record(caseID) }
     private var result: AnalysisResult? { record?.result }
 
@@ -35,6 +44,14 @@ struct ResultSummaryView: View {
         .screenBackground()
         .navigationTitle(record?.label ?? "Result")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $inspectingAngle) { target in
+                    OverlaySheet(
+                        caseID: caseID,
+                        view: target.view,
+                        overlay: target.overlay,
+                        context: target.context
+                    )
+                }
         .toolbar {
             if let narrative = result?.narrative {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -111,9 +128,53 @@ struct ResultSummaryView: View {
                     .font(.caption)
                     .foregroundStyle(Theme.watch)
             }
+            angleInspectButton(angle)
+        
         }
         .card()
     }
+    
+    /// Opens the lateral view Angle was read from.
+        ///
+        /// Angle shares its anchors with overjet, so when molar reads "not
+        /// computed" the useful question is whether the detector found the molar at
+        /// all. Seeing the boxes answers that; the words cannot.
+        @ViewBuilder
+        private func angleInspectButton(_ angle: AngleReading) -> some View {
+            if let overlays = result?.dhc.overlays {
+                // Prefer the side Angle actually reported, fall back to whichever
+                // lateral view has annotations.
+                let preferred: [ToothView] = angle.side?.lowercased().contains("left") == true
+                    ? [.left, .right]
+                    : [.right, .left]
+
+                if let match = preferred.compactMap({ view -> (ToothView, ViewOverlay)? in
+                    guard let overlay = overlays[view.wireName], !overlay.isEmpty else { return nil }
+                    return (view, overlay)
+                }).first {
+                    Button {
+                        inspectingAngle = AngleInspection(
+                            view: match.0,
+                            overlay: match.1,
+                            context: angle.hasAnyValue
+                                ? "Angle is read from the canine and molar anchors. Check the boxes are on teeth."
+                                : "Angle could not be read. The detections below are what the model did find."
+                        )
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "viewfinder")
+                            Text("Show on \(match.0.title.lowercased())")
+                            Spacer()
+                            Image(systemName: "chevron.right").font(.caption2)
+                        }
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Theme.accent)
+                        .padding(.top, 2)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
 
     private func anglePart(_ label: String, _ reading: Reading) -> some View {
         VStack(alignment: .leading, spacing: 2) {

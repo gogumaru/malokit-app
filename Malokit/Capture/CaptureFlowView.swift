@@ -12,6 +12,7 @@ struct CaptureFlowView: View {
     @State private var current: ToothView = .front
     @State private var flashFrame = false
     @State private var pickerItem: PhotosPickerItem?
+    /// Size of the live preview, needed to map the guide frame onto the photo.
     @State private var previewSize: CGSize = .zero
     @State private var captureMessage: String?
 
@@ -33,6 +34,9 @@ struct CaptureFlowView: View {
                 Color.black.ignoresSafeArea()
                 preview
 
+                // `preview` above already switches between the LiDAR AR view
+                // and dev's camera-status states, so this only owns the guide
+                // and the controls layered on top of whichever is running.
                 if isSweeping {
                     centreCrosshair(tint: sweepGuidanceTint)
                     sweepOverlay
@@ -387,6 +391,9 @@ struct CaptureFlowView: View {
                 }
             }
         } else {
+            // Cropping to the framed guide happens in `persist`, which routes
+            // both the camera and library paths through the same 3:2 geometry
+            // the LiDAR keyframes and the Smartee upload use.
             camera.capturePhoto { image in
                 persist(image, for: captureView)
             }

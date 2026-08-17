@@ -159,6 +159,16 @@ final class CaseStore {
         try persist(record)
     }
 
+    /// Renames a case. Blank input is ignored rather than wiping the label,
+    /// so a mis-tap in the rename field cannot leave a case with no name.
+    func rename(_ id: UUID, to label: String) throws {
+        guard var record = record(id) else { return }
+        let trimmed = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        record.label = trimmed
+        try persist(record)
+    }
+
     func setStatus(_ status: CaseStatus, for caseID: UUID) throws {
         guard var record = record(caseID) else { return }
         record.status = status

@@ -1,14 +1,33 @@
 import SwiftUI
 
-/// The framing guide drawn over the live preview. It shares TeethLidar's
-/// landscape 3:2 geometry with the persisted crop.
+/// The guide rectangle, in one place.
+///
+/// Both the drawn overlay and the photo crop read from here. If these were
+/// computed separately they would drift apart, and the photo would stop
+/// matching what the person framed without anything looking wrong on screen.
+///
+/// The geometry itself lives in `CaptureCropGeometry`, because the Figure-8
+/// keyframes and the Smartee upload crop to the same rectangle: every view is
+/// landscape 3:2, so what the clinician frames is exactly what reconstruction
+/// receives.
+enum GuideFrame {
+    static func rect(for view: ToothView, in size: CGSize) -> CGRect {
+        CaptureCropGeometry.guideRect(
+            previewWidth: size.width,
+            previewHeight: size.height
+        )
+    }
+}
+
+/// The framing guide drawn over the live preview. The midline tick only
+/// appears where midline actually matters.
 struct GuideOverlay: View {
     let view: ToothView
     var isReady: Bool
 
     var body: some View {
         GeometryReader { geo in
-            let frame = guideRect(in: geo.size)
+            let frame = GuideFrame.rect(for: view, in: geo.size)
 
             ZStack {
                 Color.black.opacity(0.45)
@@ -56,10 +75,4 @@ struct GuideOverlay: View {
         }
     }
 
-    private func guideRect(in size: CGSize) -> CGRect {
-        CaptureCropGeometry.guideRect(
-            previewWidth: size.width,
-            previewHeight: size.height
-        )
-    }
 }

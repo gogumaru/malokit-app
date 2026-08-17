@@ -199,7 +199,7 @@ private struct AnalyzeResponse: Decodable {
         case angle
         // DHC parameters live at the top level of the response, not nested,
         // so they are lifted into DHCResult here.
-        case overjet, overbite, missing, crowding
+        case overjet, overbite, missing, crowding, overlays
         case anteriorCrossbite = "anterior_crossbite"
         case posteriorCrossbite = "crossbite_posterior"
     }
@@ -208,14 +208,16 @@ private struct AnalyzeResponse: Decodable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         engineVersion = try c.decodeIfPresent(String.self, forKey: .engineVersion)
         angle = try c.decode(AngleReading.self, forKey: .angle)
-        dhc = DHCResult(
-            overjet: try c.decode(Reading.self, forKey: .overjet),
-            overbite: try c.decode(Reading.self, forKey: .overbite),
-            anteriorCrossbite: try c.decode(Reading.self, forKey: .anteriorCrossbite),
-            posteriorCrossbite: try c.decode(CrossbitePosterior.self, forKey: .posteriorCrossbite),
-            missing: try c.decode(MissingReading.self, forKey: .missing),
-            crowding: try c.decode(CrowdingReading.self, forKey: .crowding)
+        var built = DHCResult(
+                    overjet: try c.decode(Reading.self, forKey: .overjet),
+                    overbite: try c.decode(Reading.self, forKey: .overbite),
+                    anteriorCrossbite: try c.decode(Reading.self, forKey: .anteriorCrossbite),
+                    posteriorCrossbite: try c.decode(CrossbitePosterior.self, forKey: .posteriorCrossbite),
+                    missing: try c.decode(MissingReading.self, forKey: .missing),
+                    crowding: try c.decode(CrowdingReading.self, forKey: .crowding)
         )
+        built.overlays = try c.decodeIfPresent(OverlaySet.self, forKey: .overlays)
+        dhc = built
     }
 }
 

@@ -28,6 +28,19 @@ enum DHCParameter: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    /// The key this parameter uses in the server response, reused verbatim as
+    /// the `params` value so no translation table exists on either side.
+    var responseKey: String {
+        switch self {
+        case .overjet:            "overjet"
+        case .overbite:           "overbite"
+        case .crossbiteAnterior:  "anterior_crossbite"
+        case .crossbitePosterior: "crossbite_posterior"
+        case .missing:            "missing"
+        case .crowding:           "crowding"
+        }
+    }
+
     var symbol: String {
         switch self {
         case .overjet:            "arrow.left.and.right"
@@ -232,10 +245,36 @@ struct DHCResult: Codable, Hashable {
     var missing: MissingReading
     var crowding: CrowdingReading
 
+    /// Annotation geometry per view, keyed by the wire field names.
+    ///
+    /// Optional so cases stored before overlays existed still decode, and so a
+    /// server that has not implemented them yet simply omits the key.
+    var overlays: OverlaySet?
+
     enum CodingKeys: String, CodingKey {
-        case overjet, overbite, missing, crowding
+        case overjet, overbite, missing, crowding, overlays
         case anteriorCrossbite = "anterior_crossbite"
         case posteriorCrossbite = "crossbite_posterior"
+    }
+
+    /// Every annotated view a parameter is read from, in source order.
+    ///
+    /// Returns all of them rather than the first. Missing teeth is reported
+    /// from the occlusal and frontal views together, and the whole point of
+    /// the `disagreement` flag is that those two can differ. Showing one view
+    /// would hide exactly the case the flag exists for. Overjet and overbite
+    /// benefit the same way, since either lateral can be the clean one.
+    func overlayTargets(for parameter: DHCParameter) -> [(view: ToothView, overlay: ViewOverlay)] {
+        guard let overlays else { return [] }
+        return parameter.sourceViews.compactMap { view in
+            guard let overlay = overlays[view.wireName], !overlay.isEmpty else { return nil }
+            return (view, overlay)
+        }
+    }
+
+    /// Convenience for callers that only need one view.
+    func overlay(for parameter: DHCParameter) -> (view: ToothView, overlay: ViewOverlay)? {
+        overlayTargets(for: parameter).first
     }
 
     /// How many of the six parameters produced a trustworthy value. Drives the
