@@ -13,6 +13,7 @@ struct MockEngine: AnalysisEngine {
     let name = "Mock v2"
 
     var stageDelay: Duration = .milliseconds(650)
+    var stages: [AnalysisStage] { [.preprocess, .angle, .dhc] }
 
     func analyze(
         _ input: AnalysisInput,
@@ -20,12 +21,12 @@ struct MockEngine: AnalysisEngine {
     ) async throws -> AnalysisResult {
         guard input.isComplete else {
             throw AnalysisError.incompleteInput(
-                ToothView.allCases.filter { input.images[$0] == nil }
+                ToothView.captureOrder.filter { input.images[$0] == nil }
             )
         }
 
-        for stage in AnalysisStage.allCases {
-            await onStage(stage)
+        for stage in stages {
+            onStage(stage)
             try await Task.sleep(for: stageDelay)
         }
 

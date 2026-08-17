@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// The framing guide drawn over the live preview. Its aspect follows the view
-/// being shot, so an occlusal frame is portrait and a buccal frame is
-/// landscape. The midline tick only appears where midline actually matters.
+/// The framing guide drawn over the live preview. It shares TeethLidar's
+/// landscape 3:2 geometry with the persisted crop.
 struct GuideOverlay: View {
     let view: ToothView
     var isReady: Bool
@@ -58,19 +57,9 @@ struct GuideOverlay: View {
     }
 
     private func guideRect(in size: CGSize) -> CGRect {
-        let maxWidth = size.width * 0.9
-        let maxHeight = size.height * 0.68
-        var width = maxWidth
-        var height = width / view.guideAspect
-        if height > maxHeight {
-            height = maxHeight
-            width = height * view.guideAspect
-        }
-        return CGRect(
-            x: (size.width - width) / 2,
-            y: (size.height - height) / 2,
-            width: width,
-            height: height
+        CaptureCropGeometry.guideRect(
+            previewWidth: size.width,
+            previewHeight: size.height
         )
     }
 }

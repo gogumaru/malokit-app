@@ -22,7 +22,6 @@ struct RootView: View {
         case .dhc(let id):       DHCDetailView(caseID: id)
         case .ac(let id):        ACDetailView(caseID: id)
         case .teeth3D(let id):   Teeth3DView(caseID: id)
-        case .settings:          ServerSettingsView()
         }
     }
 }

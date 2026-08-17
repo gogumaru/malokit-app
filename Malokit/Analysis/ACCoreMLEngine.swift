@@ -4,7 +4,7 @@ import UIKit
 /// whichever engine supplies DHC and Angle. DHC and AC are genuinely
 /// separate pipelines — DHC comes from a server (`RemoteEngine`) or the
 /// mock, AC always runs on-device here — so this engine wraps a `fallback`
-/// for DHC/Angle/3D rather than assuming one specific source, and the real
+/// for DHC and Angle rather than assuming one specific source, and the real
 /// Core ML score runs regardless of which fallback is in use.
 ///
 /// This is the "single swap point" `AnalysisPipeline` calls out in its own
@@ -22,12 +22,12 @@ struct ACCoreMLEngine: AnalysisEngine {
         regressor = try? ACGraderRegressor()
     }
 
-    /// Whatever stages the DHC source runs, plus `.ac`: this engine always
-    /// attempts a real on-device score no matter where DHC came from.
+    /// The DHC source always finishes before the on-device AC score. The
+    /// pipeline owns 3D reconstruction and report persistence afterward.
     var stages: [AnalysisStage] {
-        var included = Set(fallback.stages)
-        included.insert(.ac)
-        return AnalysisStage.allCases.filter { included.contains($0) }
+        fallback.stages.filter { stage in
+            stage != .ac && stage != .model3D && stage != .report
+        } + [.ac]
     }
 
     func analyze(
@@ -40,9 +40,9 @@ struct ACCoreMLEngine: AnalysisEngine {
         // No model in the bundle, or no front photo: keep the fallback's AC
         // score rather than failing the whole report, so DHC and Angle stay
         // usable even before the model ships.
-        guard let regressor, let frontImage = input.images[.front] else { return result }
+        onStage(.ac)
 
-        await onStage(.ac)
+        guard let regressor, let frontImage = input.images[.front] else { return result }
 
         do {
             let prediction = try regressor.predict(image: frontImage)

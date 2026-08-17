@@ -26,18 +26,34 @@ final class ServerSettings {
         didSet { defaults.set(useRemote, forKey: Keys.useRemote) }
     }
 
+    /// Separate local Smartee service; never reused for DHC requests.
+    var reconstructionBaseURL: String {
+        didSet { defaults.set(reconstructionBaseURL, forKey: Keys.reconstructionBaseURL) }
+    }
+
     private let defaults = UserDefaults.standard
 
     private enum Keys {
         static let baseURL = "server.baseURL"
         static let apiKey = "server.apiKey"
         static let useRemote = "server.useRemote"
+        static let reconstructionBaseURL = "server.reconstructionBaseURL"
     }
 
     init() {
         baseURL = defaults.string(forKey: Keys.baseURL) ?? ""
         apiKey = defaults.string(forKey: Keys.apiKey) ?? ""
         useRemote = defaults.bool(forKey: Keys.useRemote)
+        let savedReconstructionURL = defaults.string(forKey: Keys.reconstructionBaseURL).map {
+            $0.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        if let savedReconstructionURL,
+           !savedReconstructionURL.isEmpty,
+           !ServerReconstructor.retiredDefaultBaseURLs.contains(savedReconstructionURL) {
+            reconstructionBaseURL = savedReconstructionURL
+        } else {
+            reconstructionBaseURL = ServerReconstructor.defaultBaseURL
+        }
     }
 
     var isConfigured: Bool {
@@ -50,6 +66,23 @@ final class ServerSettings {
         return URL(string: trimmed + path)
     }
 
+    var isReconstructionConfigured: Bool {
+        let value = reconstructionBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let url = URL(string: value),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme) else {
+            return false
+        }
+        return url.host != nil
+    }
+
+    func reconstructionURL(path: String) -> URL? {
+        let trimmed = reconstructionBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard isReconstructionConfigured else { return nil }
+        return URL(string: trimmed + path)
+    }
+
     /// Builds the engine the pipeline should use, based on the current setting.
     /// This is the single place that decides mock versus real DHC.
     ///
@@ -59,5 +92,9 @@ final class ServerSettings {
     func makeEngine() -> AnalysisEngine {
         let dhcSource: AnalysisEngine = (useRemote && isConfigured) ? RemoteEngine(settings: self) : MockEngine()
         return ACCoreMLEngine(fallback: dhcSource)
+    }
+
+    func makeReconstructor() -> any ReconstructionClient {
+        SmarteeReconstructionClient(settings: self)
     }
 }

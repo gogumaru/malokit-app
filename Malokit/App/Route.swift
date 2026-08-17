@@ -10,5 +10,4 @@ enum Route: Hashable {
     case dhc(UUID)
     case ac(UUID)
     case teeth3D(UUID)
-    case settings
 }
