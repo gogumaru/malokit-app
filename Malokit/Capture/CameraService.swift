@@ -124,9 +124,7 @@ final class CameraService: NSObject {
         if photoOutput.supportedFlashModes.contains(.on) {
             settings.flashMode = flashOn ? .on : .off
         }
-        sessionQueue.async { [photoOutput] in
-            photoOutput.capturePhoto(with: settings, delegate: self)
-        }
+        photoOutput.capturePhoto(with: settings, delegate: self)
     }
 
     enum CameraError: LocalizedError {

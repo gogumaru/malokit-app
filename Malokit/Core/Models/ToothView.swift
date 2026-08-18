@@ -9,6 +9,16 @@ enum ToothView: String, Codable, CaseIterable, Identifiable, Hashable {
     case maxillary
     case mandibular
 
+    /// The single clinician-facing order used by capture, review, DHC and
+    /// Smartee uploads. Do not derive workflow order from enum declaration.
+    static let captureOrder: [ToothView] = [
+        .front,
+        .right,
+        .left,
+        .maxillary,
+        .mandibular
+    ]
+
     var id: String { rawValue }
 
     var title: String {
@@ -28,8 +38,8 @@ enum ToothView: String, Codable, CaseIterable, Identifiable, Hashable {
         case .right:      "Turn the retractor to the patient's right. Capture the molar relation."
         case .left:       "Turn the retractor to the patient's left. Capture the molar relation."
         case .maxillary:  "Mirror against the upper arch. Fill the frame with the arch curve."
-        case .mandibular: "Mirror against the lower arch. Keep the tongue out of the frame."
-            }
+        case .mandibular: "Aim directly at the lower arch. Keep the tongue out of the frame."
+        }
     }
 
     /// What this view is actually used for downstream. Shown as a caption so
@@ -54,13 +64,24 @@ enum ToothView: String, Codable, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// Aspect of the guide frame drawn over the live preview.
-    var guideAspect: CGFloat {
+    /// Explicit multipart name expected by the Smartee reconstruction server.
+    var smarteeFieldName: String {
         switch self {
-        case .front, .right, .left: 4.0 / 3.0
-        case .maxillary, .mandibular: 3.0 / 4.0
+        case .front: "front"
+        case .right: "rightLateral"
+        case .left: "leftLateral"
+        case .maxillary: "maxillary"
+        case .mandibular: "mandibular"
         }
     }
 
-    var step: Int { (ToothView.allCases.firstIndex(of: self) ?? 0) + 1 }
+    /// Maxillary is captured through a mirror, so its depth is diagnostic
+    /// only. Every direct view records an ordered K0–K6 Figure-8 bundle.
+    var requiresFigure8: Bool { self != .maxillary }
+    var isMirrorLiDARView: Bool { self == .maxillary }
+
+    /// The live guide and the persisted RGB crop share this exact geometry.
+    var guideAspect: CGFloat { 3.0 / 2.0 }
+
+    var step: Int { (ToothView.captureOrder.firstIndex(of: self) ?? 0) + 1 }
 }

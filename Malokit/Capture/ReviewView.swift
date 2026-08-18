@@ -9,6 +9,7 @@ struct ReviewView: View {
 
     @Environment(CaseStore.self) private var store
     @State private var readings: [ToothView: QualityReading] = [:]
+    @State private var storageError: String?
     @State private var isRenaming = false
 
     private var record: CaseRecord? { store.record(caseID) }
@@ -18,7 +19,7 @@ struct ReviewView: View {
             VStack(alignment: .leading, spacing: 14) {
                 header
 
-                ForEach(ToothView.allCases) { view in
+                ForEach(ToothView.captureOrder) { view in
                     row(for: view)
                 }
 
@@ -38,7 +39,16 @@ struct ReviewView: View {
             isPresented: $isRenaming,
             currentName: record?.label ?? ""
         ) { newName in
-            store.rename(caseID, to: newName)
+            do { try store.rename(caseID, to: newName) }
+            catch { storageError = error.localizedDescription }
+        }
+        .alert("Could not update this case", isPresented: .init(
+            get: { storageError != nil },
+            set: { if !$0 { storageError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(storageError ?? "Unknown storage error")
         }
     }
 
@@ -109,9 +119,13 @@ struct ReviewView: View {
             Spacer()
 
             Button(image == nil ? "Shoot" : "Retake") {
-                if image != nil { store.clearImage(view, in: caseID) }
-                readings[view] = nil
-                path.append(.capture(caseID))
+                do {
+                    if image != nil { try store.clearImage(view, in: caseID) }
+                    readings[view] = nil
+                    path.append(.capture(caseID))
+                } catch {
+                    storageError = error.localizedDescription
+                }
             }
             .font(.footnote.weight(.semibold))
             .buttonStyle(.bordered)
@@ -123,12 +137,12 @@ struct ReviewView: View {
     private var runBar: some View {
         VStack(spacing: 8) {
             Button {
-                path.append(.analyzing(caseID))
+                startAnalysis()
             } label: {
                 Text("Run analysis")
                     .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
             }
             .buttonStyle(.borderedProminent)
             .tint(Theme.accent)
@@ -145,9 +159,13 @@ struct ReviewView: View {
         .background(.ultraThinMaterial)
     }
 
+    private func startAnalysis() {
+        path.append(.analyzing(caseID))
+    }
+
     private func measureAll() async {
         guard let record else { return }
-        for view in ToothView.allCases {
+        for view in ToothView.captureOrder {
             guard
                 let filename = record.filename(for: view),
                 let image = ImageStore.load(caseID: caseID, filename: filename),

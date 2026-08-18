@@ -15,7 +15,7 @@ struct RemoteEngine: AnalysisEngine {
     /// The server computes DHC and Angle only. It does not produce an aesthetic
     /// component or a 3D mesh, so those stages are not advertised to the user
     /// as if something were running.
-    var stages: [AnalysisStage] { [.preprocess, .angle, .dhc, .report] }
+    var stages: [AnalysisStage] { [.preprocess, .angle, .dhc] }
 
     /// Form field name for each view, per the contract. Explicit, never derived.
     static let fieldNames: [ToothView: String] = [
@@ -32,7 +32,7 @@ struct RemoteEngine: AnalysisEngine {
     ) async throws -> AnalysisResult {
         guard input.isComplete else {
             throw AnalysisError.incompleteInput(
-                ToothView.allCases.filter { input.images[$0] == nil }
+                ToothView.captureOrder.filter { input.images[$0] == nil }
             )
         }
         guard let endpoint = settings.url(path: "/v1/analyze") else {
@@ -40,9 +40,9 @@ struct RemoteEngine: AnalysisEngine {
         }
 
         // Build the upload.
-        await onStage(.preprocess)
+        onStage(.preprocess)
         var builder = MultipartBuilder()
-        for view in ToothView.allCases {
+        for view in ToothView.captureOrder {
             guard let field = Self.fieldNames[view] else { continue }
             guard let data = jpegData(for: view, in: input) else {
                 throw AnalysisError.engineFailed(
@@ -65,8 +65,8 @@ struct RemoteEngine: AnalysisEngine {
 
         // Send. The server reports no sub-progress, so the request itself is
         // shown as the DHC stage rather than faking finer granularity.
-        await onStage(.angle)
-        await onStage(.dhc)
+        onStage(.angle)
+        onStage(.dhc)
 
         let data: Data
         let response: URLResponse
@@ -89,8 +89,6 @@ struct RemoteEngine: AnalysisEngine {
                 reason: ServerError.describe(data: data, statusCode: http.statusCode)
             )
         }
-
-        await onStage(.report)
 
         let decoder = JSONDecoder()
         let payload: AnalyzeResponse

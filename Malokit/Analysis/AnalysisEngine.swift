@@ -41,7 +41,7 @@ struct AnalysisInput {
     let images: [ToothView: UIImage]
 
     var isComplete: Bool {
-        ToothView.allCases.allSatisfy { images[$0] != nil }
+        ToothView.captureOrder.allSatisfy { images[$0] != nil }
     }
 }
 

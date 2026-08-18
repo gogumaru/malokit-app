@@ -62,8 +62,11 @@ Legend: **done** shipped and working, **wip** in progress, **todo** not started.
 ### 3D — wip (Nico)
 - [x] SceneKit viewer, rotate and zoom
 - [x] Two point measuring tool in millimetres
-- [x] Placeholder arch so the screen is usable now
-- [ ] Load real reconstructed mesh (`.usdz` / `.obj`), export in mm
+- [x] Load Smartee upper/lower OBJ meshes and patient textures in millimetres
+      (the placeholder arch is gone; the viewer only shows a real reconstruction)
+- [x] Figure-8 LiDAR sweep after each direct intraoral capture, uploaded with
+      the photos, with live server stage progress on the 3D card
+- [ ] Validate texture orientation and controls on a physical LiDAR iPhone
 
 ### Report — todo (TBD)
 - [ ] PDF export of the full case

@@ -5,7 +5,9 @@ struct ResultSummaryView: View {
     @Binding var path: [Route]
 
     @Environment(CaseStore.self) private var store
-    
+    @Environment(ServerSettings.self) private var settings
+    @Environment(ReconstructionService.self) private var reconstructionService
+
     @State private var inspectingAngle: AngleInspection?
 
     private struct AngleInspection: Identifiable {
@@ -222,11 +224,48 @@ struct ResultSummaryView: View {
 
             featureCard(
                 title: "3D view",
-                value: result.model3DFilename == nil ? "Preview mesh" : "Reconstructed",
-                detail: "Rotate, zoom, measure",
-                tint: Theme.accent,
+                value: reconstructionValue(result),
+                detail: reconstructionDetail(result),
+                tint: reconstructionTint(result),
                 symbol: "cube.transparent"
-            ) { path.append(.teeth3D(caseID)) }
+            ) {
+                switch ReconstructionAvailability.resolve(result.reconstruction) {
+                case .ready: path.append(.teeth3D(caseID))
+                case .processing: break
+                case .needsReconstruction, .failed:
+                    reconstructionService.start(
+                        caseID: caseID,
+                        store: store,
+                        reconstructor: settings.makeReconstructor()
+                    )
+                }
+            }
+        }
+    }
+
+    private func reconstructionValue(_ result: AnalysisResult) -> String {
+        switch ReconstructionAvailability.resolve(result.reconstruction) {
+        case .ready: "Reconstructed"
+        case .processing: "Building 3D model"
+        case .failed: "3D unavailable"
+        case .needsReconstruction: "3D unavailable"
+        }
+    }
+
+    private func reconstructionDetail(_ result: AnalysisResult) -> String {
+        switch ReconstructionAvailability.resolve(result.reconstruction) {
+        case .ready: "Tap to inspect the reconstructed arches"
+        case .processing(let progress):
+            "\(progress.label) • Step \(progress.completedSteps + 1) of \(progress.totalSteps) (\(progress.percentComplete)%)"
+        case .failed(let message): "Retry reconstruction — " + message
+        case .needsReconstruction: "Retry reconstruction"
+        }
+    }
+
+    private func reconstructionTint(_ result: AnalysisResult) -> Color {
+        switch ReconstructionAvailability.resolve(result.reconstruction) {
+        case .ready, .processing: Theme.accent
+        case .needsReconstruction, .failed: Theme.watch
         }
     }
 

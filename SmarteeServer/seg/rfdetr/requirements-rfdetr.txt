@@ -1,0 +1,2 @@
+# Kept separate from Smartee's TensorFlow environment.
+rfdetr[train]==1.9.0

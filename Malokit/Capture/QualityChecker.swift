@@ -48,6 +48,12 @@ enum QualityChecker {
     /// copied while the preview is running.
     static func evaluate(sampleBuffer: CMSampleBuffer) -> QualityReading? {
         guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return nil }
+        return evaluate(pixelBuffer: pixelBuffer)
+    }
+
+    /// ARKit path. It uses the same luma-plane thresholds as AVCapture so
+    /// moving to a persistent AR preview does not change Malokit's feedback.
+    static func evaluate(pixelBuffer: CVPixelBuffer) -> QualityReading? {
         CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
 

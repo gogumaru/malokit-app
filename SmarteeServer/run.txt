@@ -1,0 +1,3 @@
+cd "/Users/nizikai/Documents/AIML/Challenge 2/Model Exploration/3D-Teeth-Reconstruction-from-Five-Intra-oral-Images"
+source venv_py39/bin/activate
+python main.py

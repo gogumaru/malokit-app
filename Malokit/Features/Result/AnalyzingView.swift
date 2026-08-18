@@ -6,6 +6,7 @@ struct AnalyzingView: View {
 
     @Environment(CaseStore.self) private var store
     @Environment(ServerSettings.self) private var settings
+    @Environment(ReconstructionService.self) private var reconstructionService
 
     /// Built once on appear from the current settings, so the choice between
     /// the mock and the real server is made at run time, not at compile time.
@@ -41,8 +42,6 @@ struct AnalyzingView: View {
                         .buttonStyle(.bordered)
                         .tint(Theme.accent)
 
-                        Button("Server settings") { path.append(.settings) }
-                            .buttonStyle(.bordered)
                     }
                 }
                 .card()
@@ -58,11 +57,17 @@ struct AnalyzingView: View {
         .task {
             guard !started else { return }
             started = true
-            pipeline = AnalysisPipeline(engine: settings.makeEngine())
+            pipeline = AnalysisPipeline(
+                engine: settings.makeEngine(),
+                reconstructor: settings.makeReconstructor(),
+                reconstructionService: reconstructionService
+            )
             await pipeline.run(caseID: caseID, store: store)
         }
         .onChange(of: pipeline.state) { _, state in
-            if state == .finished { path = [.result(caseID)] }
+            if state == .finished {
+                path = [.result(caseID)]
+            }
         }
     }
 
@@ -81,11 +86,14 @@ struct AnalyzingView: View {
 
     private func stageRow(_ stage: AnalysisStage) -> some View {
         let isDone = pipeline.completedStages.contains(stage)
+        let isFailed = pipeline.failedStages.contains(stage)
         let isActive = pipeline.state == .running(stage)
 
         return HStack(spacing: 12) {
             ZStack {
-                if isDone {
+                if isFailed {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.watch)
+                } else if isDone {
                     Image(systemName: "checkmark.circle.fill").foregroundStyle(Theme.accent)
                 } else if isActive {
                     ProgressView().controlSize(.small)
@@ -98,7 +106,7 @@ struct AnalyzingView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(stage.title)
                     .font(.subheadline.weight(isActive ? .semibold : .regular))
-                    .foregroundStyle(isDone || isActive ? Theme.ink : Theme.inkSoft)
+                    .foregroundStyle(isDone || isActive || isFailed ? Theme.ink : Theme.inkSoft)
                 Text(stage.detail).font(.caption2).foregroundStyle(Theme.inkSoft)
             }
             Spacer()
