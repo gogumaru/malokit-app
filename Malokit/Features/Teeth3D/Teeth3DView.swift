@@ -176,13 +176,13 @@ struct Teeth3DView: View {
         }
         if reconstruction.status == .processing {
             loadState = .failed(
-                "Smartee is still building this model. Return to the result to follow its progress."
+                "This 3D model is still being built. Go back to the result to follow its progress."
             )
             return
         }
         guard reconstruction.status == .complete else {
             loadState = .failed(
-                reconstruction.errorMessage ?? "Smartee reconstruction failed. Return to the result and retry."
+                reconstruction.errorMessage ?? "Building the 3D model failed. Go back to the result and try again."
             )
             return
         }
@@ -235,7 +235,7 @@ private struct SceneContainer: UIViewRepresentable {
         let view = SCNView()
         view.allowsCameraControl = true
         view.autoenablesDefaultLighting = false
-        view.antialiasingMode = .multisampling2X
+        view.antialiasingMode = .multisampling4X
         view.backgroundColor = UIColor(Theme.surface)
         view.defaultCameraController.inertiaEnabled = true
 
@@ -280,7 +280,6 @@ private struct SceneContainer: UIViewRepresentable {
 
         func installScene(in view: SCNView) {
             let scene = parent.reconstruction.scene
-            scene.background.contents = UIColor(Theme.surface)
             scene.rootNode.childNode(withName: "malokitViewerCamera", recursively: false)?
                 .removeFromParentNode()
 
@@ -289,6 +288,14 @@ private struct SceneContainer: UIViewRepresentable {
             camera.camera = SCNCamera()
             camera.camera?.fieldOfView = 45
             camera.camera?.zNear = 0.1
+            // Ambient occlusion is what makes two touching teeth read as two
+            // teeth: it darkens the narrow gap between them. Without it the
+            // arch renders as one continuous surface, which is most of why the
+            // model looked like a single grey blob. The radius is in scene
+            // units, so it is millimetres here — roughly one interdental gap.
+            camera.camera?.screenSpaceAmbientOcclusionIntensity = 1.6
+            camera.camera?.screenSpaceAmbientOcclusionRadius = 2.5
+            camera.camera?.screenSpaceAmbientOcclusionDepthThreshold = 0.4
 
             let target = SCNVector3Zero
             parent.reconstruction.apply(parent.appearance)

@@ -31,7 +31,7 @@ final class ServerSettings {
         didSet { defaults.set(reconstructionBaseURL, forKey: Keys.reconstructionBaseURL) }
     }
 
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
 
     private enum Keys {
         static let baseURL = "server.baseURL"
@@ -40,7 +40,11 @@ final class ServerSettings {
         static let reconstructionBaseURL = "server.reconstructionBaseURL"
     }
 
-    init() {
+    /// Injectable so tests can run against their own suite instead of the one
+    /// shared process-wide. Parallel tests otherwise read and write the same
+    /// four keys and fail each other intermittently.
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         baseURL = defaults.string(forKey: Keys.baseURL) ?? ""
         apiKey = defaults.string(forKey: Keys.apiKey) ?? ""
         useRemote = defaults.bool(forKey: Keys.useRemote)

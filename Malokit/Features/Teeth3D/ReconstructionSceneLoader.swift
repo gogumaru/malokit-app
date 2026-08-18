@@ -352,23 +352,87 @@ nonisolated enum ReconstructionSceneLoader {
         return UIImage(data: data)
     }
 
+    /// Directional lights, not omni: the meshes are in millimetres, so a light
+    /// at a fixed position sat almost inside the arch and lit it flatly. A
+    /// direction has no position to get wrong at this scale.
+    ///
+    /// Key and fill give the crowns a light-to-dark gradient, the rim separates
+    /// the arch from the background, and ambient is kept low and neutral —
+    /// ambient light carries no direction, so every unit of it flattens the
+    /// form and (when tinted) drains the enamel colour.
     private static func installLighting(in scene: SCNScene) {
-        let key = SCNNode()
-        key.name = "keyLight"
-        key.light = SCNLight()
-        key.light?.type = .omni
-        key.light?.intensity = 900
-        key.light?.temperature = 5_600
-        key.position = SCNVector3(35, 55, 70)
-        scene.rootNode.addChildNode(key)
+        func directional(
+            _ name: String,
+            intensity: CGFloat,
+            temperature: CGFloat,
+            from position: SCNVector3
+        ) -> SCNNode {
+            let node = SCNNode()
+            node.name = name
+            node.light = SCNLight()
+            node.light?.type = .directional
+            node.light?.intensity = intensity
+            node.light?.temperature = temperature
+            node.position = position
+            node.look(at: SCNVector3Zero)
+            return node
+        }
+
+        scene.rootNode.addChildNode(
+            directional("keyLight", intensity: 780, temperature: 5_200,
+                        from: SCNVector3(-70, 95, 120))
+        )
+        scene.rootNode.addChildNode(
+            directional("fillLight", intensity: 260, temperature: 7_200,
+                        from: SCNVector3(90, -30, 70))
+        )
+        scene.rootNode.addChildNode(
+            directional("rimLight", intensity: 430, temperature: 6_500,
+                        from: SCNVector3(0, 60, -130))
+        )
 
         let ambient = SCNNode()
         ambient.name = "ambientLight"
         ambient.light = SCNLight()
         ambient.light?.type = .ambient
-        ambient.light?.intensity = 420
-        ambient.light?.color = UIColor(red: 0.88, green: 0.94, blue: 0.92, alpha: 1)
+        ambient.light?.intensity = 150
+        ambient.light?.color = UIColor(white: 0.98, alpha: 1)
         scene.rootNode.addChildNode(ambient)
+
+        // Physically based materials are mostly specular reflection, so with
+        // nothing to reflect they render as flat matte paint. This gives them
+        // a sky-to-floor gradient to pick up, which is what makes enamel read
+        // as a hard wet surface instead of chalk.
+        scene.lightingEnvironment.contents = verticalGradient(
+            top: UIColor(white: 1.0, alpha: 1),
+            bottom: UIColor(red: 0.55, green: 0.60, blue: 0.62, alpha: 1)
+        )
+        scene.lightingEnvironment.intensity = 1.15
+
+        scene.background.contents = verticalGradient(
+            top: UIColor(red: 0.93, green: 0.95, blue: 0.95, alpha: 1),
+            bottom: UIColor(red: 0.76, green: 0.81, blue: 0.81, alpha: 1)
+        )
+    }
+
+    /// A backdrop that is darker at the bottom does two jobs at once: it stops
+    /// the pale arch disappearing into a flat panel of near-identical grey, and
+    /// it reads as a ground plane, which is most of the depth cue here.
+    private static func verticalGradient(top: UIColor, bottom: UIColor) -> UIImage {
+        let size = CGSize(width: 8, height: 256)
+        return UIGraphicsImageRenderer(size: size).image { context in
+            guard let gradient = CGGradient(
+                colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                colors: [top.cgColor, bottom.cgColor] as CFArray,
+                locations: [0, 1]
+            ) else { return }
+            context.cgContext.drawLinearGradient(
+                gradient,
+                start: .zero,
+                end: CGPoint(x: 0, y: size.height),
+                options: []
+            )
+        }
     }
 }
 
@@ -376,9 +440,16 @@ nonisolated private func applyClinicalMaterial(to root: SCNNode) {
     applyMaterials(to: root) {
         let material = SCNMaterial()
         material.lightingModel = .physicallyBased
-        material.diffuse.contents = UIColor(red: 0.94, green: 0.92, blue: 0.86, alpha: 1)
-        material.roughness.contents = 0.68
+        // Enamel is warm and only slightly off-white. The old value was both
+        // duller and darker, which under a tinted ambient read as grey-green.
+        material.diffuse.contents = UIColor(red: 0.97, green: 0.95, blue: 0.91, alpha: 1)
+        // Low roughness plus a clear coat is what gives a crown its wet
+        // highlight; at 0.68 every surface scattered light equally and no
+        // edge between two touching teeth was visible.
+        material.roughness.contents = 0.38
         material.metalness.contents = 0.0
+        material.clearCoat.contents = 0.45
+        material.clearCoatRoughness.contents = 0.12
         material.isDoubleSided = true
         return material
     }
@@ -393,8 +464,10 @@ nonisolated private func applyPatientMaterial(texture: UIImage, to root: SCNNode
         material.diffuse.wrapT = .clamp
         material.diffuse.magnificationFilter = .linear
         material.diffuse.minificationFilter = .linear
-        material.roughness.contents = 0.72
+        material.roughness.contents = 0.5
         material.metalness.contents = 0.0
+        material.clearCoat.contents = 0.3
+        material.clearCoatRoughness.contents = 0.15
         material.isDoubleSided = true
         return material
     }

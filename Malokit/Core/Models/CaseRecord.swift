@@ -71,15 +71,15 @@ enum ReconstructionProgress: String, Codable, Hashable, CaseIterable {
 
     var label: String {
         switch self {
-        case .preparing:  "Preparing LiDAR capture data"
-        case .uploading:  "Uploading photos and Figure-8 data"
-        case .queued:     "Smartee received the capture"
-        case .segmenting: "Finding tooth edges in the photos"
-        case .stage0:     "Aligning the arch model to the photos"
-        case .stage1:     "Estimating tooth scale"
-        case .gridSearch: "Searching for the best global fit"
-        case .stage23:    "Refining tooth pose and shape"
-        case .saving:     "Saving the reconstructed arches"
+        case .preparing:  "Preparing your photos and scan"
+        case .uploading:  "Uploading your photos and scan"
+        case .queued:     "Upload received, waiting to start"
+        case .segmenting: "Finding the tooth edges in your photos"
+        case .stage0:     "Matching a 3D model to your photos"
+        case .stage1:     "Working out the size of your teeth"
+        case .gridSearch: "Finding the best overall fit"
+        case .stage23:    "Fine-tuning each tooth"
+        case .saving:     "Saving your 3D model"
         }
     }
 }
