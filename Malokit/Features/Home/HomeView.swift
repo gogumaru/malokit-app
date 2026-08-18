@@ -19,6 +19,11 @@ struct HomeView: View {
         .screenBackground()
         .navigationTitle("Malokit")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button { path.append(.settings) } label: {
+                    Image(systemName: "gearshape")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button(action: startCase) {
                     Label("New analysis", systemImage: "plus")

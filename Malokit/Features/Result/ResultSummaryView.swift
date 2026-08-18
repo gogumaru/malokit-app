@@ -245,20 +245,20 @@ struct ResultSummaryView: View {
 
     private func reconstructionValue(_ result: AnalysisResult) -> String {
         switch ReconstructionAvailability.resolve(result.reconstruction) {
-        case .ready: "Reconstructed"
-        case .processing: "Building 3D model"
-        case .failed: "3D unavailable"
-        case .needsReconstruction: "3D unavailable"
+        case .ready: "Ready to view"
+        case .processing: "Building your 3D model"
+        case .failed: "3D model unavailable"
+        case .needsReconstruction: "3D model not built yet"
         }
     }
 
     private func reconstructionDetail(_ result: AnalysisResult) -> String {
         switch ReconstructionAvailability.resolve(result.reconstruction) {
-        case .ready: "Tap to inspect the reconstructed arches"
+        case .ready: "Tap to see your upper and lower teeth in 3D"
         case .processing(let progress):
             "\(progress.label) • Step \(progress.completedSteps + 1) of \(progress.totalSteps) (\(progress.percentComplete)%)"
-        case .failed(let message): "Retry reconstruction — " + message
-        case .needsReconstruction: "Retry reconstruction"
+        case .failed(let message): "Tap to try again — " + message
+        case .needsReconstruction: "Tap to build it"
         }
     }
 

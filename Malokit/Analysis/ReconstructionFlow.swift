@@ -16,7 +16,7 @@ enum ReconstructionAvailability: Equatable {
             return .ready
         case .failed:
             return .failed(
-                reconstruction.errorMessage ?? "Smartee reconstruction failed."
+                reconstruction.errorMessage ?? "Building the 3D model failed."
             )
         }
     }

@@ -395,7 +395,7 @@ struct CaptureFlowView: View {
             // both the camera and library paths through the same 3:2 geometry
             // the LiDAR keyframes and the Smartee upload use.
             camera.capturePhoto { image in
-                persist(image, for: captureView)
+                persist(image, for: captureView, previewSize: previewSize)
             }
         }
     }
@@ -405,46 +405,72 @@ struct CaptureFlowView: View {
         let image = data.flatMap(UIImage.init(data:))
         await MainActor.run {
             pickerItem = nil
-            if let image { persist(image, for: captureView) }
+            // A library photo was never framed in the live guide, so the
+            // preview-derived crop would zoom hard into its centre. Centre-crop
+            // to 3:2 instead.
+            if let image { persist(image, for: captureView, previewSize: .zero) }
         }
     }
 
-    private func persist(_ image: UIImage, for captureView: ToothView) {
-        let prepared = preparedThreeByTwo(image, previewSize: previewSize)
+    private func persist(_ image: UIImage, for captureView: ToothView, previewSize: CGSize) {
+        flashShutter()
+        // Decoding, rotating and downscaling a full-resolution photo costs
+        // hundreds of milliseconds. On the main thread that stalls the live
+        // preview, which reads as the camera freezing.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let prepared = Self.preparedThreeByTwo(image, previewSize: previewSize)
+            DispatchQueue.main.async { save(prepared) }
+        }
+
+        // The store publishes observation and mutates the case index, so it
+        // stays on the main thread. Its own work is small: one JPEG encode of
+        // an already downscaled image plus a file move.
+        func save(_ prepared: UIImage) {
+            do {
+                try store.attach(prepared, to: caseID, view: captureView)
+                advanceAfterSaving()
+            } catch {
+                captureMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func flashShutter() {
         withAnimation(.easeOut(duration: 0.08)) { flashFrame = true }
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.09) {
             withAnimation(.easeIn(duration: 0.18)) { flashFrame = false }
-        }
-
-        do {
-            try store.attach(prepared, to: caseID, view: captureView)
-            advanceAfterSaving()
-        } catch {
-            captureMessage = error.localizedDescription
         }
     }
 
     private func persist(_ capture: CapturedPhoto, for captureView: ToothView) {
         // ARKit already cropped the high-resolution K0 image to the exact
         // visible guide. Cropping again would shrink it by the guide inset.
-        let prepared = Preprocessor.prepare(Preprocessor.upright(capture.image))
-        let storedCapture = CapturedPhoto(
-            image: prepared,
-            timestamp: capture.timestamp,
-            type: capture.type,
-            depthData: capture.depthData,
-            lidarCapture: capture.lidarCapture,
-            figure8Capture: capture.figure8Capture
-        )
-        do {
-            try store.attach(storedCapture, to: caseID, view: captureView)
-            advanceAfterSaving()
-        } catch {
-            captureMessage = error.localizedDescription
+        // Same reason as the photo path: the downscale is too slow for main.
+        DispatchQueue.global(qos: .userInitiated).async {
+            let prepared = Preprocessor.prepare(Preprocessor.upright(capture.image))
+            let storedCapture = CapturedPhoto(
+                image: prepared,
+                timestamp: capture.timestamp,
+                type: capture.type,
+                depthData: capture.depthData,
+                lidarCapture: capture.lidarCapture,
+                figure8Capture: capture.figure8Capture
+            )
+            DispatchQueue.main.async { save(storedCapture) }
+        }
+
+        func save(_ storedCapture: CapturedPhoto) {
+            do {
+                try store.attach(storedCapture, to: caseID, view: captureView)
+                advanceAfterSaving()
+            } catch {
+                captureMessage = error.localizedDescription
+            }
         }
     }
 
-    private func preparedThreeByTwo(_ image: UIImage, previewSize: CGSize) -> UIImage {
+    /// Static so it can run off the main thread without touching view state.
+    private static func preparedThreeByTwo(_ image: UIImage, previewSize: CGSize) -> UIImage {
         let upright = Preprocessor.upright(image)
         guard let cgImage = upright.cgImage,
               let crop = try? CaptureCropGeometry.landscapeThreeByTwo(

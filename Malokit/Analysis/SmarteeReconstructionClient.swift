@@ -63,12 +63,12 @@ struct SmarteeReconstructionClient: ReconstructionClient {
             from: upload.body
         )
         guard let http = response as? HTTPURLResponse else {
-            throw SmarteeReconstructionError(message: "No HTTP response from Smartee.")
+            throw SmarteeReconstructionError(message: "The 3D model server did not respond.")
         }
         guard http.statusCode == 200 else {
             let serverMessage = (try? JSONDecoder().decode(SmarteeErrorResponse.self, from: data).error)
             throw SmarteeReconstructionError(
-                message: serverMessage ?? "Smartee returned status \(http.statusCode)."
+                message: serverMessage ?? "The 3D model server reported an error (status \(http.statusCode))."
             )
         }
 
@@ -77,7 +77,7 @@ struct SmarteeReconstructionClient: ReconstructionClient {
             ?? responseBody.models?.first
         guard let upperOBJ = model?.upperObj ?? responseBody.upperObj,
               let lowerOBJ = model?.lowerObj ?? responseBody.lowerObj else {
-            throw SmarteeReconstructionError(message: "Smartee returned no upper/lower OBJ models.")
+            throw SmarteeReconstructionError(message: "The 3D model server did not return an upper and lower arch.")
         }
 
         reportProgress(.saving)
@@ -134,10 +134,10 @@ struct SmarteeReconstructionClient: ReconstructionClient {
         boundary: String = "Malokit-Smartee-\(UUID().uuidString)"
     ) throws -> SmarteeUpload {
         guard let endpoint = settings.reconstructionURL(path: "/reconstruct") else {
-            throw SmarteeReconstructionError(message: "Smartee reconstruction address is not valid.")
+            throw SmarteeReconstructionError(message: "The 3D model server address is not valid.")
         }
         guard record.isComplete else {
-            throw SmarteeReconstructionError(message: "All five photos are required for reconstruction.")
+            throw SmarteeReconstructionError(message: "All five photos are needed to build the 3D model.")
         }
 
         var builder = SmarteeMultipartBuilder(boundary: boundary)
@@ -185,14 +185,14 @@ struct SmarteeReconstructionClient: ReconstructionClient {
 
     static func checkHealth(settings: ServerSettings) async -> HealthReport {
         guard let url = settings.reconstructionURL(path: "/health") else {
-            return HealthReport(ok: false, message: "Smartee address is not valid.")
+            return HealthReport(ok: false, message: "The 3D model server address is not valid.")
         }
         var request = URLRequest(url: url)
         request.timeoutInterval = 8
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                return HealthReport(ok: false, message: "Smartee did not return a healthy response.")
+                return HealthReport(ok: false, message: "The 3D model server is not responding normally.")
             }
             let payload = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             let status = payload?["status"] as? String ?? "ready"
@@ -227,7 +227,7 @@ struct SmarteeReconstructionClient: ReconstructionClient {
                   bundle.isComplete,
                   let k0 = bundle.keyframes[.k0] else {
                 throw SmarteeReconstructionError(
-                    message: "The \(view.title) Figure-8 bundle is incomplete; reconstruction was not uploaded."
+                    message: "The \(view.title) scan is incomplete, so the 3D model was not built."
                 )
             }
             return LoadedSmarteeArtifacts(
@@ -267,11 +267,11 @@ struct SmarteeReconstructionClient: ReconstructionClient {
         to builder: inout SmarteeMultipartBuilder
     ) throws {
         guard bundle.isComplete else {
-            throw SmarteeReconstructionError(message: "Incomplete Figure-8 bundle for \(field).")
+            throw SmarteeReconstructionError(message: "The \(field) scan is incomplete.")
         }
         let entries = try Figure8KeyframeID.allCases.map { id -> Figure8UploadManifest.Entry in
             guard let artifact = bundle.keyframes[id] else {
-                throw SmarteeReconstructionError(message: "Missing \(id.wireName) for \(field).")
+                throw SmarteeReconstructionError(message: "The \(field) scan is missing part of its sweep.")
             }
             return .init(
                 id: id.wireName,

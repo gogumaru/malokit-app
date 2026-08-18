@@ -36,31 +36,33 @@ struct MalokitTests {
 
     @MainActor
     @Test func freshSettingsPreconfigureOnlyTheSmarteeReconstructionServer() {
-        let defaults = UserDefaults.standard
+        // Its own suite, so a test running in parallel cannot write these keys
+        // underneath this one.
+        let suiteName = "malokit.tests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
         let key = "server.reconstructionBaseURL"
-        let previousValue = defaults.object(forKey: key)
-        defer {
-            if let previousValue {
-                defaults.set(previousValue, forKey: key)
-            } else {
-                defaults.removeObject(forKey: key)
-            }
-        }
-        defaults.removeObject(forKey: key)
 
-        let settings = ServerSettings()
+        // Asserted against the source of truth, not a literal: the lab address
+        // changes whenever the server moves, and that must not fail the suite.
+        let expected = ServerReconstructor.defaultBaseURL
+        let settings = ServerSettings(defaults: defaults)
 
-        #expect(settings.reconstructionBaseURL == "http://10.67.32.116:8000")
+        #expect(settings.reconstructionBaseURL == expected)
         #expect(settings.baseURL.isEmpty)
         #expect(!settings.useRemote)
 
         defaults.set("", forKey: key)
-        let upgradedSettings = ServerSettings()
-        #expect(upgradedSettings.reconstructionBaseURL == "http://10.67.32.116:8000")
+        let upgradedSettings = ServerSettings(defaults: defaults)
+        #expect(upgradedSettings.reconstructionBaseURL == expected)
 
-        defaults.set("http://10.67.49.60:8000", forKey: key)
-        let migratedSettings = ServerSettings()
-        #expect(migratedSettings.reconstructionBaseURL == "http://10.67.32.116:8000")
+        // A device still holding a previous default must be migrated onto the
+        // current one, since nothing in the app can repoint it by hand.
+        #expect(!ServerReconstructor.retiredDefaultBaseURLs.contains(expected))
+        for retired in ServerReconstructor.retiredDefaultBaseURLs {
+            defaults.set(retired, forKey: key)
+            #expect(ServerSettings(defaults: defaults).reconstructionBaseURL == expected)
+        }
     }
 
     @Test func everyVisibleGuideUsesThePersistedLandscapeThreeByTwoCrop() {
@@ -275,6 +277,19 @@ struct MalokitTests {
         #expect(abs(CGFloat(crop.height) * aspectFillScale - guide.height) < oneExactThreeByTwoStep)
     }
 
+    @Test func libraryImportKeepsTheWholeFrameInsteadOfTheGuideCrop() throws {
+        let crop = try CaptureCropGeometry.landscapeThreeByTwo(
+            originalWidth: 4032,
+            originalHeight: 3024,
+            previewWidth: 0,
+            previewHeight: 0
+        )
+        // No preview means no guide, so only the 3:2 letterbox is removed.
+        #expect(crop.width == 4032)
+        #expect(crop.x == 0)
+        #expect(crop.width * 2 == crop.height * 3)
+    }
+
     @MainActor
     @Test func successfulLiDARRetakeReplacesTheWholeBundle() throws {
         let indexURL = temporaryCaseIndexURL()
@@ -343,11 +358,12 @@ struct MalokitTests {
         let indexURL = temporaryCaseIndexURL()
         let store = CaseStore(fileURL: indexURL)
         let record = try store.createCase(label: "Multipart fixture")
-        let settings = ServerSettings()
-        let previousURL = settings.reconstructionBaseURL
+        // Own defaults suite: writing the shared one races parallel tests.
+        let suiteName = "malokit.tests.\(UUID().uuidString)"
+        let settings = ServerSettings(defaults: UserDefaults(suiteName: suiteName)!)
         settings.reconstructionBaseURL = "http://127.0.0.1:8000"
         defer {
-            settings.reconstructionBaseURL = previousURL
+            UserDefaults().removePersistentDomain(forName: suiteName)
             ImageStore.deleteFolder(for: record.id)
             try? FileManager.default.removeItem(at: indexURL)
         }
@@ -399,11 +415,12 @@ struct MalokitTests {
         let indexURL = temporaryCaseIndexURL()
         let store = CaseStore(fileURL: indexURL)
         let record = try store.createCase(label: "Incomplete bundle fixture")
-        let settings = ServerSettings()
-        let previousURL = settings.reconstructionBaseURL
+        // Own defaults suite: writing the shared one races parallel tests.
+        let suiteName = "malokit.tests.\(UUID().uuidString)"
+        let settings = ServerSettings(defaults: UserDefaults(suiteName: suiteName)!)
         settings.reconstructionBaseURL = "http://127.0.0.1:8000"
         defer {
-            settings.reconstructionBaseURL = previousURL
+            UserDefaults().removePersistentDomain(forName: suiteName)
             ImageStore.deleteFolder(for: record.id)
             try? FileManager.default.removeItem(at: indexURL)
         }
