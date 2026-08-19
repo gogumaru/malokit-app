@@ -53,10 +53,8 @@ struct ResultSummaryView: View {
                     )
                 }
         .toolbar {
-            if let narrative = result?.narrative {
-                ToolbarItem(placement: .topBarTrailing) {
-                    ShareLink(item: narrative) { Image(systemName: "square.and.arrow.up") }
-                }
+            ToolbarItem(placement: .topBarTrailing) {
+                ReportExportButton(caseID: caseID)
             }
         }
     }

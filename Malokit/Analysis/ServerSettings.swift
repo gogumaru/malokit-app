@@ -47,7 +47,15 @@ final class ServerSettings {
         self.defaults = defaults
         baseURL = defaults.string(forKey: Keys.baseURL) ?? ""
         apiKey = defaults.string(forKey: Keys.apiKey) ?? ""
-        useRemote = defaults.bool(forKey: Keys.useRemote)
+        // .bool(forKey:) returns false both when the key was never set and
+        // when it was explicitly turned off, so those two cases cannot be
+        // told apart that way. A fresh install should default to on, since a
+        // fresh baseURL is empty and isConfigured stays false until someone
+        // types an address — makeEngine() falls back to MockEngine regardless
+        // of this flag until then. Once a person has switched it either way,
+        // that choice is remembered and never overridden again.
+        let hasStoredRemotePreference = defaults.object(forKey: Keys.useRemote) != nil
+        useRemote = hasStoredRemotePreference ? defaults.bool(forKey: Keys.useRemote) : true
         let savedReconstructionURL = defaults.string(forKey: Keys.reconstructionBaseURL).map {
             $0.trimmingCharacters(in: .whitespacesAndNewlines)
         }

@@ -1,0 +1,18 @@
+# Pipeline
+ultralytics>=8.3.0
+torch>=2.2
+numpy>=1.26
+scipy>=1.11
+scikit-learn>=1.4
+opencv-python>=4.9
+pillow>=10.0
+pillow-heif>=0.16        # baca HEIC/HEIF (format default kamera iPhone)
+
+# Server
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9
+
+# Test
+pytest>=8.0
+httpx>=0.27
