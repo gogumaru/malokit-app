@@ -29,3 +29,17 @@ Carthage/Build/
 # Secrets, kalau nanti ada API key backend
 Secrets.plist
 *.env
+
+# Local Smartee runtime (server code may be versioned; machine state may not)
+SmarteeServer/venv_py39/
+SmarteeServer/.venv-rfdetr/
+SmarteeServer/**/__pycache__/
+SmarteeServer/**/*.py[cod]
+SmarteeServer/seg/valid/
+SmarteeServer/seg/rfdetr/.cache/
+SmarteeServer/seg/rfdetr/prepared/
+SmarteeServer/seg/rfdetr/prepared-multiview/
+SmarteeServer/seg/rfdetr/runs/
+SmarteeServer/demo/mesh/
+SmarteeServer/demo/_temp/
+SmarteeServer/demo/reconstruction_data/

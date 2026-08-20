@@ -1,15 +1,33 @@
 import SwiftUI
 
-/// The framing guide drawn over the live preview. Its aspect follows the view
-/// being shot, so an occlusal frame is portrait and a buccal frame is
-/// landscape. The midline tick only appears where midline actually matters.
+/// The guide rectangle, in one place.
+///
+/// Both the drawn overlay and the photo crop read from here. If these were
+/// computed separately they would drift apart, and the photo would stop
+/// matching what the person framed without anything looking wrong on screen.
+///
+/// The geometry itself lives in `CaptureCropGeometry`, because the Figure-8
+/// keyframes and the Smartee upload crop to the same rectangle: every view is
+/// landscape 3:2, so what the clinician frames is exactly what reconstruction
+/// receives.
+enum GuideFrame {
+    static func rect(for view: ToothView, in size: CGSize) -> CGRect {
+        CaptureCropGeometry.guideRect(
+            previewWidth: size.width,
+            previewHeight: size.height
+        )
+    }
+}
+
+/// The framing guide drawn over the live preview. The midline tick only
+/// appears where midline actually matters.
 struct GuideOverlay: View {
     let view: ToothView
     var isReady: Bool
 
     var body: some View {
         GeometryReader { geo in
-            let frame = guideRect(in: geo.size)
+            let frame = GuideFrame.rect(for: view, in: geo.size)
 
             ZStack {
                 Color.black.opacity(0.45)
@@ -57,20 +75,4 @@ struct GuideOverlay: View {
         }
     }
 
-    private func guideRect(in size: CGSize) -> CGRect {
-        let maxWidth = size.width * 0.9
-        let maxHeight = size.height * 0.68
-        var width = maxWidth
-        var height = width / view.guideAspect
-        if height > maxHeight {
-            height = maxHeight
-            width = height * view.guideAspect
-        }
-        return CGRect(
-            x: (size.width - width) / 2,
-            y: (size.height - height) / 2,
-            width: width,
-            height: height
-        )
-    }
 }

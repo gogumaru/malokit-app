@@ -4,6 +4,8 @@ struct ServerSettingsView: View {
     @Environment(ServerSettings.self) private var settings
     @State private var health: HealthReport?
     @State private var isChecking = false
+    @State private var reconHealth: HealthReport?
+    @State private var isCheckingRecon = false
 
     var body: some View {
         @Bindable var settings = settings
@@ -15,7 +17,7 @@ struct ServerSettingsView: View {
                 Text("Off means the app runs on built-in sample data and never touches the network.")
             }
 
-            Section("Server address") {
+            Section("DHC server address") {
                 TextField("http://192.168.1.24:8000", text: $settings.baseURL)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
@@ -51,10 +53,46 @@ struct ServerSettingsView: View {
                 Text("Checks /v1/health. The phone and the server must be on the same network.")
             }
 
+            Section {
+                TextField(ServerReconstructor.defaultBaseURL, text: $settings.reconstructionBaseURL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                    .font(.system(.body, design: .monospaced))
+
+                Button {
+                    Task { await checkReconstruction() }
+                } label: {
+                    HStack {
+                        Text("Test connection")
+                        Spacer()
+                        if isCheckingRecon { ProgressView().controlSize(.small) }
+                    }
+                }
+                .disabled(!settings.isReconstructionConfigured || isCheckingRecon)
+
+                if let reconHealth {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: reconHealth.ok ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        Text(reconHealth.message)
+                    }
+                    .font(.caption)
+                    .foregroundStyle(reconHealth.ok ? Theme.calm : Theme.urgent)
+                }
+            } header: {
+                Text("3D model server")
+            } footer: {
+                Text("Separate Smartee service used only for the 3D reconstruction. Checks /health.")
+            }
+
             Section("Notes") {
                 labelled("Photos sent", "5 per case, JPEG")
                 labelled("Produced here", "DHC and Angle")
-                labelled("Not produced here", "AC and 3D, separate pipelines")
+                labelled("Elsewhere", "AC on device, 3D on the model server")
+            }
+
+            Section {
+                AboutButton()
             }
         }
         .navigationTitle("Server")
@@ -75,5 +113,12 @@ struct ServerSettingsView: View {
         health = nil
         health = await RemoteEngine.checkHealth(settings: settings)
         isChecking = false
+    }
+
+    private func checkReconstruction() async {
+        isCheckingRecon = true
+        reconHealth = nil
+        reconHealth = await SmarteeReconstructionClient.checkHealth(settings: settings)
+        isCheckingRecon = false
     }
 }

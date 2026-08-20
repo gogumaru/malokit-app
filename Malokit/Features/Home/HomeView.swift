@@ -3,6 +3,10 @@ import SwiftUI
 struct HomeView: View {
     @Binding var path: [Route]
     @Environment(CaseStore.self) private var store
+    @State private var storageError: String?
+    @State private var isNamingNewCase = false
+    @State private var pendingCaseID: UUID?
+    @State private var renamingCurrentName = ""
 
     var body: some View {
         Group {
@@ -26,7 +30,33 @@ struct HomeView: View {
                 }
             }
         }
-        .onAppear { store.pruneEmptyDrafts() }
+        .onAppear {
+            do { try store.pruneEmptyDrafts() }
+            catch { storageError = error.localizedDescription }
+        }
+        .caseNamePrompt(
+            isPresented: $isNamingNewCase,
+            title: renamingCurrentName.isEmpty ? "New case" : "Rename case",
+            currentName: renamingCurrentName
+        ) { name in
+            guard let id = pendingCaseID else { return }
+            do { try store.rename(id, to: name) }
+            catch { storageError = error.localizedDescription }
+            // Only a brand new case continues into capture. Renaming an
+            // existing one should leave the person where they were.
+            if renamingCurrentName.isEmpty {
+                path.append(.capture(id))
+            }
+            renamingCurrentName = ""
+        }
+        .alert("Could not update cases", isPresented: .init(
+            get: { storageError != nil },
+            set: { if !$0 { storageError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(storageError ?? "Unknown storage error")
+        }
     }
 
     private var empty: some View {
@@ -57,7 +87,15 @@ struct HomeView: View {
                     Button { open(record) } label: { CaseRow(record: record) }
                         .buttonStyle(.plain)
                         .contextMenu {
-                            Button("Delete", role: .destructive) { store.delete(record.id) }
+                            Button("Rename") {
+                                pendingCaseID = record.id
+                                renamingCurrentName = record.label
+                                isNamingNewCase = true
+                            }
+                            Button("Delete", role: .destructive) {
+                                do { try store.delete(record.id) }
+                                catch { storageError = error.localizedDescription }
+                            }
                         }
                 }
             }
@@ -66,8 +104,13 @@ struct HomeView: View {
     }
 
     private func startCase() {
-        let record = store.createCase()
-        path.append(.capture(record.id))
+        do {
+            let record = try store.createCase()
+            pendingCaseID = record.id
+            isNamingNewCase = true
+        } catch {
+            storageError = error.localizedDescription
+        }
     }
 
     private func open(_ record: CaseRecord) {
