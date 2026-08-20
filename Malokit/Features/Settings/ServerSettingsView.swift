@@ -90,6 +90,10 @@ struct ServerSettingsView: View {
                 labelled("Produced here", "DHC and Angle")
                 labelled("Elsewhere", "AC on device, 3D on the model server")
             }
+
+            Section {
+                AboutButton()
+            }
         }
         .navigationTitle("Server")
         .navigationBarTitleDisplayMode(.inline)
